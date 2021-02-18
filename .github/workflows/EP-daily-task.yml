@@ -39,6 +39,6 @@ jobs:
     - name: Run APP
       run: |
         python text.py
-        python ./push/pushplus.py
+        python push/pushplus.py
        
    
