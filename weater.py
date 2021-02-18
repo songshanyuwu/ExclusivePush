@@ -6,8 +6,8 @@ import os
 
 
 PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
-SCKEY = os.environ.get('SCKEY')                 ##Server酱推送KEY
-SKEY = os.environ.get('SKEY')                   ##CoolPush酷推KEY
+SERVERSCKEY = os.environ.get('SERVERSCKEY')                 ##Server酱推送KEY
+COOLSCKEY = os.environ.get('COOLSCKEY')                   ##CoolPush酷推KEY
 
 
 def get_iciba_everyday():
@@ -36,7 +36,7 @@ def PushPlus(info): #PUSHPLUS酱推送
 
 
 def ServerPush(info): #Server酱推送
-    api = "https://sc.ftqq.com/{}.send".format(SCKEY)
+    api = "https://sc.ftqq.com/{}.send".format(SERVERSCKEY)
     title = u"天气推送"
     content = info.replace('\n','\n\n')
     data = {
@@ -48,9 +48,9 @@ def ServerPush(info): #Server酱推送
     
     
 def CoolPush(info): #CoolPush酷推
-    # cpurl = 'https://push.xuthus.cc/group/'+spkey   #推送到QQ群
-    # cpurl = 'https://push.xuthus.cc/send/' + SKey  # 推送到个人QQ
-    api='https://push.xuthus.cc/send/{}'.format(SKey)
+    # cpurl = 'https://push.xuthus.cc/group/'+COOLSCKEY   #推送到QQ群
+    # cpurl = 'https://push.xuthus.cc/send/' + COOLSCKEY  # 推送到个人QQ
+    api='https://push.xuthus.cc/send/{}'.format(COOLSCKEY)
     print(api)
     print(info)
     requests.post(api, info.encode('utf-8'))
