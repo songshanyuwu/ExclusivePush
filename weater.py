@@ -67,16 +67,13 @@ def main():
         weather = {}
         if(d['status'] == 200):     #当返回状态码为200，输出天气状况
             # 天气提示内容
-            weather['更新时间'] = d["time"]
-            weather['省市'] = d["cityInfo"]["parent"] + d["cityInfo"]["city"]
-            weather['日期'] = d["data"]["forecast"][0]["ymd"]
-            weather['星期'] = d["data"]["forecast"][0]["week"]
+            weather['天气更新时间'] = d["time"]
+            weather['省市'] = d["cityInfo"]["parent"] + ' ' + d["cityInfo"]["city"]
+            weather['日期'] = d["data"]["forecast"][0]["ymd"] + '   星期:' + d["data"]["forecast"][0]["week"]
             weather['天气'] = d["data"]["forecast"][0]["type"]
-            weather['温度'] = d["data"]["forecast"][0]["high"] + d["data"]["forecast"][0]["low"]
-            weather['PM2.5'] = str(d["data"]["pm25"])
-            weather['PM10'] = str(d["data"]["pm10"])
-            weather['天气质量'] = d["data"]["quality"]
-            weather['风力风向'] = d["data"]["forecast"][0]["fx"] + d["data"]["forecast"][0]["fl"]
+            weather['温度'] = d["data"]["forecast"][0]["high"] + ' / ' + d["data"]["forecast"][0]["low"]
+            weather['天气质量'] = d["data"]["quality"] + '   PM2.5:' + str(d["data"]["pm25"]) + '    PM10:' + str(d["data"]["pm10"])
+            weather['风力风向'] = d["data"]["forecast"][0]["fx"] + ' ' +  d["data"]["forecast"][0]["fl"]
             weather['感冒指数'] = d["data"]["ganmao"]
             weather['温馨提示'] = d["data"]["forecast"][0]["notice"]
             weather['每日英语句子'] = get_iciba_everyday()
