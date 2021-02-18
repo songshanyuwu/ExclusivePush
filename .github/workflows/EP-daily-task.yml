@@ -51,8 +51,8 @@ jobs:
       # 运行脚本
     - name: 'Working'
       env:	#添加环境变量
-        SCKEY: ${{ secrets.PUSHPLUSSCKEY }}
-        SCKEY: ${{ secrets.SCKEY }}
-        SKEY: ${{ secrets.SKEY }}
+        PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
+        SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
+        COOLSCKEY: ${{ secrets.COOLSCKEY }}
       run: python weater.py
    
