@@ -28,14 +28,12 @@ jobs:
     # 检出，就是官方社区贡献的用来拉取仓库分支的 Action，你不需要考虑安装 git 命令工具，只需要把分支参数传入即可。
     - name: Checkout
       uses: actions/checkout@v2
-    #  with:
-    #      ref: master
 
     # Python 环境
-    - name: Set up Python 3.9
+    - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
-        python-version: 3.9
+        python-version: 3.8
 
     # 运行
     - name: Run APP
