@@ -54,5 +54,5 @@ jobs:
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
         SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
-      run: python weater.py
+      run: python weather.py
    
