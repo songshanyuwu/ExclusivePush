@@ -20,7 +20,7 @@ def get_iciba_everyday():
     return str
 
 
-def ServerPush(info): #PUSHPLUS酱推送
+def PushPlus(info): #PUSHPLUS酱推送
     token = PUSHPLUSSCKEY #在pushpush网站中可以找到
     title= u"天气推送" #改成你要的标题内容
     content = info.replace('\n','\n\n') #改成你要的正文内容
@@ -87,6 +87,7 @@ def main():
                    "\n风力风向: " + fx + fl + "\n感冒指数: "  + ganmao + "\n温馨提示： " + tips + "\n更新时间: " + update_time + "\n✁-----------------------------------------\n" + get_iciba_everyday()
             # print(tdwt)
             # requests.post(cpurl,tdwt.encode('utf-8'))         #把天气数据转换成UTF-8格式，不然要报错。
+            PushPlus(tdwt)
             ServerPush(tdwt)
             CoolPush(tdwt)
     except Exception:
