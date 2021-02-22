@@ -71,7 +71,9 @@ def main():
             weather['省市'] = d["cityInfo"]["parent"] + ' ' + d["cityInfo"]["city"]
             weather['日期'] = d["data"]["forecast"][0]["ymd"] + ' ' + d["data"]["forecast"][0]["week"]
             weather['天气'] = d["data"]["forecast"][0]["type"]
-            weather['温度'] = d["data"]["forecast"][0]["high"] + ' / ' + d["data"]["forecast"][0]["low"]
+            weather['昨日温度'] = d["data"]["yesterday"]["high"] + ' / ' + d["data"]["yesterday"]["low"]
+            weather['今日温度'] = d["data"]["forecast"][0]["high"] + ' / ' + d["data"]["forecast"][0]["low"]
+            weather['明日温度'] = d["data"]["forecast"][1]["high"] + ' / ' + d["data"]["forecast"][1]["low"]
             weather['天气质量'] = d["data"]["quality"] + ' /PM2.5:' + str(d["data"]["pm25"]) + ' /PM10:' + str(d["data"]["pm10"])
             weather['风力风向'] = d["data"]["forecast"][0]["fx"] + ' ' +  d["data"]["forecast"][0]["fl"]
             weather['感冒指数'] = d["data"]["ganmao"]
