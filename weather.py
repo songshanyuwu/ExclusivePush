@@ -86,11 +86,18 @@ def main():
             
             # 天气提示内容
             tdwt = "【今日份天气】\n城市： " + d["cityInfo"]["parent"] + d["cityInfo"]["city"] + \
-                   "\n日期： " + d["data"]["forecast"][0]["ymd"] + "\n星期: " + d["data"]["forecast"][0]["week"] + \
-                   "\n天气: " + d["data"]["forecast"][0]["type"] + "\n温度: " + d["data"]["forecast"][0]["high"] + " / "+ d["data"]["forecast"][0]["low"] + \
-                   "\n湿度: " + d["data"]["shidu"] + "\nPM25: " + str(d["data"]["pm25"]) + "\nPM10: " + str(d["data"]["pm10"]) + \
-                   "\n空气质量: " + d["data"]["quality"] + "\n风力风向: " + d["data"]["forecast"][0]["fx"] + d["data"]["forecast"][0]["fl"] + \
-                   "\n感冒指数: "  + d["data"]["ganmao"] + "\n温馨提示： " + d["data"]["forecast"][0]["notice"] + "\n更新时间: " + d["time"] + \
+                   "\n日期： " + d["data"]["forecast"][0]["ymd"] + \
+                   "\n星期: " + d["data"]["forecast"][0]["week"] + \
+                   "\n天气: " + d["data"]["forecast"][0]["type"] + \
+                   "\n昨日温度: " + d["data"]["yesterday"]["high"] + " / "+ d["data"]["yesterday"]["low"] + \
+                   "\n今日温度: " + d["data"]["forecast"][0]["high"] + " / "+ d["data"]["forecast"][0]["low"] + \
+                   "\n明日温度: " + d["data"]["forecast"][1]["high"] + " / "+ d["data"]["forecast"][1]["low"] + \
+                   "\n湿度: " + d["data"]["shidu"] + "\n PM25: " + str(d["data"]["pm25"]) + "\n PM10: " + str(d["data"]["pm10"]) + \
+                   "\n空气质量: " + d["data"]["quality"] + \
+                   "\n风力风向: " + d["data"]["forecast"][0]["fx"] + d["data"]["forecast"][0]["fl"] + \
+                   "\n感冒指数: "  + d["data"]["ganmao"] + \
+                   "\n温馨提示： " + d["data"]["forecast"][0]["notice"] + \
+                   "\n更新时间: " + d["time"] + \
                    "\n✁-----------------------------------------\n" + get_iciba_everyday()
             # print(tdwt)
             ServerPush(tdwt)
