@@ -1,6 +1,5 @@
 name: EP-daily-task
 
-
 on:
   
   workflow_dispatch: # 手动触发
@@ -9,7 +8,6 @@ on:
     # cron表达式，时区是UTC时间，比我们早8小时，要用我们的时间减去8小时后填上去，如上所表示的是每天23点5分
     # 建议每个人都修改下时间！不要使用默认时间！最好不要设定在整点，错开峰值，避免大量G站同一个IP在相同时间去请求B站接口，导致IP被禁！
     
-
 jobs:
   run-EP-tool:
 
@@ -17,7 +15,6 @@ jobs:
 
     steps:
     
-
     # 输出服务器的IP
     #- name: IP
     #  run: sudo curl ifconfig.me
@@ -35,16 +32,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
+        
     #- name: Install dependencies
     #  run: |
-    #    python -m pip install --upgrade pip
+    ##    python -m pip install --upgrade pip
     #    pip install requests json
     #    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-    # 运行
-    #- name: Run APP
-    #  run: |
-    #    python text.py
 
     # 安装脚本所需的依赖
     - name: Install requests
