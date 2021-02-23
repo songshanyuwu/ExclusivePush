@@ -48,5 +48,6 @@ jobs:
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
         SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
+        QMSGSCKEY: ${{ secrets.QMSGSCKEY }}
       run: python weather.py
-   
+           python epidemicSsituation.py
