@@ -1,10 +1,14 @@
+#!/usr/bin/python3
+#coding=utf-8
+
 import requests,random,json
 
 url = "https://c.m.163.com/ug/api/wuhan/app/data/list-total"
-server_key = 'xxxxx'
-coolpush_key = 'xxxxx'
-qmsg_key = 'xxxxx'
-pushplus_key = 'xxxxx'
+
+pushplus_key = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
+server_key = os.environ.get('SERVERSCKEY')     ##Server酱推送KEY
+coolpush_key = os.environ.get('COOLSCKEY')         ##CoolPush酷推KEY
+qmsg_key = os.environ.get('QMSGSCKEY')         ##CoolPush酷推KEY
 
 
 def UserAgent(): #随机获取请求头
@@ -39,13 +43,14 @@ def get_data(url_json):
 
     lastUpdateTime = url_json['data']['lastUpdateTime']#截止时间
 
-    data ='-' * 8 +'全国疫情数据实时统计' + '-' * 8 + '\n统计截至时间：'+ lastUpdateTime +'\n' + '-' * 32 + '\n' + \
-          '  累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm + \
-          '\n  现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm + \
-          '\n  累计死亡：' + total_dead + ' ; ' + '较昨日：' + today_dead + \
-          '\n  累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal + \
-          '\n  境外输入：' + total_input + ' ; ' + '较昨日：' + today_input + \
-          '\n  无症状感染者：' + total_noSymptom + ' ; ' + '较昨日：' + today_incrNoSymptom
+    data ='[+] 标题：' + '全国疫情数据实时统计' + '\n\n' + \
+          '统计截至时间：'+ lastUpdateTime +'\n\n' + \
+          '累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm +'\n\n' + \
+          '现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm +'\n\n' + \
+          '累计死亡：' + total_dead + ' ; ' + '较昨日：' + today_dead +'\n\n' + \
+          '累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal +'\n\n' + \
+          '境外输入：' + total_input + ' ; ' + '较昨日：' + today_input +'\n\n' + \
+          '无症状感染者：' + total_noSymptom + ' ; ' + '较昨日：' + today_incrNoSymptom +'\n\n' 
     return data
 
 
@@ -66,18 +71,19 @@ def get_data2(url_json):
 
     lastUpdateTime = url_json['lastUpdateTime']#截止时间
 
-    data ='-' * 8 + url_json['name'] + '地区疫情数据实时统计' + '-' * 8 + '\n统计截至时间：'+ lastUpdateTime +'\n' + '-' * 32 + '\n' + \
-          '  累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm + \
-          '\n  现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm + \
-          '\n  累计死亡：' + total_dead + ' ; ' + '较昨日：' + today_dead + \
-          '\n  累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal 
+    data ='[+] 标题：' + url_json['name'] + '疫情数据实时统计' + '\n\n' + \
+          '统计截至时间：'+ lastUpdateTime + '\n\n' + \
+          '累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm + '\n\n' + \
+          '现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm + '\n\n' + \
+          '累计死亡：' + total_dead + ' ; ' + '较昨日：' + today_dead + '\n\n' + \
+          '累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal + '\n\n' 
     return data
 
 
 def Get_Url():
     url_json = requests.get(url=url,headers=UserAgent()).json()
     data = get_data(url_json)
-    print(data)
+    # print(data)
 
     # 遍历列表字典，重新获取地区或者省市数据
     data2 = ''
@@ -89,12 +95,14 @@ def Get_Url():
                         data2 = data2 + '\n\n' + get_data2(l2)
                     for l3 in l2['children']:
                         if l3['name'] in ['济南','东营','烟台']:
+                            print(l3)
                             data2 = data2 + '\n\n'  + get_data2(l3)
-    print(data2)
 
     data = data + data2
 
-    select_robots(0,data) #0为Qmsg推送，1为酷推推送，2为server酱推送。默认为0
+    select_robots(2,data) #3为Qmsg推送，1为酷推推送，2为server酱推送。默认为0
+    print('ok')
+
 
 def select_robots(i,data):
     if i == 0:
@@ -124,18 +132,6 @@ def HtmlPuch_Qmsg(data):  #Qmsg推送
     push_data = {'msg':data}
     html = requests.get(url=url_key,params=push_data,headers=UserAgent())
 
-# def HtmlPuch_PushPlus(data): #PushPlus推送
-#     url = 'http://pushplus.hxtrip.com/send'
-#     data = {
-#         "token":pushplus_key,
-#         "title":u"全国疫情数据实时统计",
-#         "content":data,
-#         "template":"json"
-#     }
-#     body=json.dumps(data).encode(encoding='utf-8')
-#     headers = {'Content-Type':'application/json'}
-#     requests.post(url, data=body, headers=headers)
-
 def HtmlPuch_PushPlus(data): #PushPlus推送
     url = 'http://pushplus.hxtrip.com/send'
     data = {
@@ -146,6 +142,7 @@ def HtmlPuch_PushPlus(data): #PushPlus推送
     body=json.dumps(data).encode(encoding='utf-8')
     headers = {'Content-Type':'application/json'}
     requests.post(url, data=body, headers=headers)
+
 
 if __name__ == '__main__':
     Get_Url()
