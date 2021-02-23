@@ -100,8 +100,8 @@ def main():
                    "\n更新时间: " + d["time"] + \
                    "\n✁-----------------------------------------\n" + get_iciba_everyday()
             # print(tdwt)
-            ServerPush(tdwt)
-            CoolPush(tdwt)
+            # ServerPush(tdwt)
+            # CoolPush(tdwt)
     except Exception:
         error = '【出现错误】\n　　今日天气推送错误，请检查服务或网络状态！'
         print(error)
