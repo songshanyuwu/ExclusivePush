@@ -2,6 +2,7 @@
 #coding=utf-8
 
 import requests,random,json
+import os
 
 url = "https://c.m.163.com/ug/api/wuhan/app/data/list-total"
 
