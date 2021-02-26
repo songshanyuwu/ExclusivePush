@@ -11,7 +11,7 @@ COOLSCKEY = os.environ.get('COOLSCKEY')         ##CoolPush酷推KEY
 
 
 def PushPlus(info): #PUSHPLUS酱推送
-    token = pushplus_key               #在pushpush网站中可以找到
+    token = PUSHPLUSSCKEY               #在pushpush网站中可以找到
     title= u"天气推送"                   #改成你要的标题内容
     content = info.replace('\n','\n\n') #改成你要的正文内容
     url = 'http://pushplus.hxtrip.com/send'
@@ -27,7 +27,7 @@ def PushPlus(info): #PUSHPLUS酱推送
 
 
 def ServerPush(info): #Server酱推送
-    api = "https://sc.ftqq.com/{}.send".format(server_key)
+    api = "https://sc.ftqq.com/{}.send".format(SERVERSCKEY)
     title = u"天气推送"
     content = info.replace('\n','\n\n')
     data = {
@@ -39,9 +39,9 @@ def ServerPush(info): #Server酱推送
     
     
 def CoolPush(info): #CoolPush酷推
-    # cpurl = 'https://push.xuthus.cc/group/'+coolpush_key   #推送到QQ群
-    # cpurl = 'https://push.xuthus.cc/send/' + coolpush_key  # 推送到个人QQ
-    api='https://push.xuthus.cc/send/{}'.format(coolpush_key)
+    # cpurl = 'https://push.xuthus.cc/group/'+COOLSCKEY   #推送到QQ群
+    # cpurl = 'https://push.xuthus.cc/send/' + COOLSCKEY  # 推送到个人QQ
+    api='https://push.xuthus.cc/send/{}'.format(COOLSCKEY)
     # print(api)
     # print(info)
     requests.post(api, info.encode('utf-8'))
