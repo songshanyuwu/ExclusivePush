@@ -32,7 +32,10 @@ def get_data(url_json):
     today_storeConfirm = str(url_json['data']['chinaTotal']['today']['storeConfirm'])#全国现有确诊较昨日
     today_dead =str(url_json['data']['chinaTotal']['today']['dead'])#累计死亡较昨日新增
     today_heal = str(url_json['data']['chinaTotal']['today']['heal'])#累计治愈较昨日新增
-    today_incrNoSymptom = str(url_json['data']['chinaTotal']['extData']['incrNoSymptom'])#无症状感染者较昨日
+    try:
+        today_incrNoSymptom = str(url_json['data']['chinaTotal']['extData']['incrNoSymptom'])#无症状感染者较昨日
+    except:
+        today_incrNoSymptom = 'null'
 
     total_confirm = str(url_json['data']['chinaTotal']['total']['confirm'])  # 全国累计确诊
     total_input = str(url_json['data']['chinaTotal']['total']['input'])  # 境外输入
