@@ -42,12 +42,21 @@ jobs:
     # 安装脚本所需的依赖
     - name: Install requests
       run: pip install requests
+      
       # 运行脚本
-    - name: 'Working'
+    - name: 'Working1'
       env:	#添加环境变量
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
         SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
         QMSGSCKEY: ${{ secrets.QMSGSCKEY }}
       run: python weather.py
-           python epidemicSsituation.py
+      
+      # 运行脚本
+    - name: 'Working2'
+      env:	#添加环境变量
+        PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
+        SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
+        COOLSCKEY: ${{ secrets.COOLSCKEY }}
+        QMSGSCKEY: ${{ secrets.QMSGSCKEY }}
+      run: python epidemicSsituation.py
