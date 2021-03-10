@@ -54,7 +54,8 @@ def get_data(url_json):
           '累计死亡：' + total_dead + ' ; ' + '较昨日：' + today_dead +'\n\n' + \
           '累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal +'\n\n' + \
           '境外输入：' + total_input + ' ; ' + '较昨日：' + today_input +'\n\n' + \
-          '无症状感染者：' + total_noSymptom + ' ; ' + '较昨日：' + today_incrNoSymptom +'\n\n' 
+          '无症状感染者：' + total_noSymptom + ' ; ' + '较昨日：' + today_incrNoSymptom +'\n\n' + \
+          "\n✁-----------------------------------------\n"
     return data
 
 
@@ -80,7 +81,8 @@ def get_data2(url_json):
           '累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm + '\n\n' + \
           '现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm + '\n\n' + \
           '累计死亡：' + total_dead + ' ; ' + '较昨日：' + today_dead + '\n\n' + \
-          '累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal + '\n\n' 
+          '累计治愈：' + total_heal + ' ; ' + '较昨日：' + today_heal + '\n\n' + \
+          "\n✁-----------------------------------------\n"
     return data
 
 
