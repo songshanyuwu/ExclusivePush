@@ -72,7 +72,7 @@ def weather1(city_code):
             weather['省市'] = d["cityInfo"]["parent"] + ' ' + d["cityInfo"]["city"]
             weather['日期'] = d["data"]["forecast"][0]["ymd"] + ' ' + d["data"]["forecast"][0]["week"]
             weather['昨日温度'] = d["data"]["yesterday"]["high"] + ' / ' + d["data"]["yesterday"]["low"] + ' / ' + d["data"]["yesterday"]["type"]
-            weather['今日温度'] = d["data"]["forecast"][0]["high"] + ' / ' + d["data"]["forecast"][0]["low"] + ' / ' + d["data"]["forecast"][0]["type"]
+            weather['-今日温度'] = d["data"]["forecast"][0]["high"] + ' / ' + d["data"]["forecast"][0]["low"] + ' / ' + d["data"]["forecast"][0]["type"]
             weather['明日温度'] = d["data"]["forecast"][1]["high"] + ' / ' + d["data"]["forecast"][1]["low"] + ' / ' + d["data"]["forecast"][1]["type"]
             weather['后日温度'] = d["data"]["forecast"][2]["high"] + ' / ' + d["data"]["forecast"][2]["low"] + ' / ' + d["data"]["forecast"][2]["type"]
             weather['天气质量'] = d["data"]["quality"] + ' /PM2.5:' + str(d["data"]["pm25"]) + ' /PM10:' + str(d["data"]["pm10"])
@@ -102,7 +102,7 @@ def weather2(city_code):
             tdwt = "【今日份天气】\n城市： " + d["cityInfo"]["parent"] + d["cityInfo"]["city"] + "  /  " + d["data"]["forecast"][0]["ymd"] + d["data"]["forecast"][0]["week"] + \
                    "\n更新时间: " + d["time"] + \
                    "\n昨日温度: " + d["data"]["yesterday"]["high"] + "  /  " + d["data"]["yesterday"]["low"] + "  /  " + d["data"]["yesterday"]["type"] + \
-                   "\n今日温度: " + d["data"]["forecast"][0]["high"] + "  /  " + d["data"]["forecast"][0]["low"] + "  /  " + d["data"]["forecast"][0]["type"] + \
+                   "\n-今日温度: " + d["data"]["forecast"][0]["high"] + "  /  " + d["data"]["forecast"][0]["low"] + "  /  " + d["data"]["forecast"][0]["type"] + \
                    "\n明日温度: " + d["data"]["forecast"][1]["high"] + "  /  " + d["data"]["forecast"][1]["low"] + "  /  " + d["data"]["forecast"][1]["type"] + \
                    "\n后日温度: " + d["data"]["forecast"][2]["high"] + "  /  " + d["data"]["forecast"][2]["low"] + "  /  " + d["data"]["forecast"][2]["type"] + \
                    "\n湿度  /  空气质量  /  PM2.5  /  PM10  /  风力风向\n" +  \
