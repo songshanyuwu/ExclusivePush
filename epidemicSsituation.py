@@ -106,7 +106,7 @@ def Get_Url():
 
     data = data + data2
 
-    select_robots(2,data) #3为Qmsg推送，1为酷推推送，2为server酱推送。默认为0
+    select_robots(0,data) #3为Qmsg推送，1为酷推推送，2为server酱推送。默认为0
     print('ok')
 
 
