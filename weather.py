@@ -134,8 +134,8 @@ def main():
     for item in city_codes:
         weatherContent2 =  weatherContent2 + weather2(item)
     # print(weatherContent2)
-    ServerPush(weatherContent2 + get_iciba_everyday())
-    # CoolPush(weatherContent2)
+    # ServerPush(weatherContent2 + get_iciba_everyday())
+    PushPlus(weatherContent2 + get_iciba_everyday())
 
 
 if __name__ == '__main__':
