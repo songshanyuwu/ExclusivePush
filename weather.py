@@ -5,25 +5,24 @@ import requests, json
 import os
 
 
-PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
-SERVERSCKEY = os.environ.get('SERVERSCKEY')     ##Server酱推送KEY
-COOLSCKEY = os.environ.get('COOLSCKEY')         ##CoolPush酷推KEY
+# PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
+# SERVERSCKEY = os.environ.get('SERVERSCKEY')     ##Server酱推送KEY
+# COOLSCKEY = os.environ.get('COOLSCKEY')         ##CoolPush酷推KEY
 
+
+def HtmlPuch_PushPlus(pneumoniaData): #PushPlus推送
+    token = pushplus_key #在pushplus网站中可以找到
+    title= '全国疫情数据实时统计' #改成你要的标题内容
+    content = pneumoniaData #改成你要的正文内容
+    url = 'http://www.pushplus.plus/send?token='+token+'&title='+title+'&content='+content+'&template=html'
+    requests.get(url)
 
 def PushPlus(info): #PUSHPLUS酱推送
     token = PUSHPLUSSCKEY               #在pushpush网站中可以找到
-    title= u"天气推送"                   #改成你要的标题内容
-    content = info.replace('\n','\n\n') #改成你要的正文内容
-    url = 'http://pushplus.hxtrip.com/send'
-    data = {
-        "token":token,
-        "title":title,
-        "content":content,
-        "template":"json"
-    }
-    body=json.dumps(data).encode(encoding='utf-8')
-    headers = {'Content-Type':'application/json'}
-    requests.post(url, data=body, headers=headers)
+    title= '天气推送'                   #改成你要的标题内容
+    content = info #改成你要的正文内容
+    url = 'http://www.pushplus.plus/send?token='+token+'&title='+title+'&content='+content+'&template=html'
+    requests.get(url)
 
 
 def ServerPush(info): #Server酱推送
