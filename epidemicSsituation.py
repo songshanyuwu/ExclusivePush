@@ -48,7 +48,7 @@ def get_data(url_json):
 
     lastUpdateTime = url_json['data']['lastUpdateTime']#截止时间
 
-    data ='[+] 标题：' + '全国疫情数据实时统计' + '\n\n' + \
+    data ='[\+] 标题：' + '全国疫情数据实时统计' + '\n\n' + \
           '统计截至时间：'+ lastUpdateTime +'\n' + \
           '累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm +'\n' + \
           '现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm +'\n' + \
@@ -77,7 +77,7 @@ def get_data2(url_json):
 
     lastUpdateTime = url_json['lastUpdateTime']#截止时间
 
-    data ='[+] 标题：' + url_json['name'] + '疫情数据实时统计' + '\n\n' + \
+    data ='[\+] 标题：' + url_json['name'] + '疫情数据实时统计' + '\n\n' + \
           '统计截至时间：'+ lastUpdateTime + '\n' + \
           '累计确诊：' + total_confirm + ' ; ' + '较昨日：' + today_confirm + '\n' + \
           '现有确诊：' + total_storeConfirm + ' ; ' + '较昨日：' + today_storeConfirm + '\n' + \
