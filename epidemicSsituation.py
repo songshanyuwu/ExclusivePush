@@ -30,7 +30,10 @@ def UserAgent(): #随机获取请求头
 
 def get_data(url_json):
     today_confirm = str(url_json['data']['chinaTotal']['today']['confirm'])#全国累计确诊较昨日新增
-    today_input =str(url_json['data']['chinaTotal']['today']['input'])#全国较昨日新增境外输入
+    try:
+        today_input = str(url_json['data']['chinaTotal']['today']['input'])#全国较昨日新增境外输入
+    except:
+        today_input = 'null'
     today_storeConfirm = str(url_json['data']['chinaTotal']['today']['storeConfirm'])#全国现有确诊较昨日
     today_dead =str(url_json['data']['chinaTotal']['today']['dead'])#累计死亡较昨日新增
     today_heal = str(url_json['data']['chinaTotal']['today']['heal'])#累计治愈较昨日新增
