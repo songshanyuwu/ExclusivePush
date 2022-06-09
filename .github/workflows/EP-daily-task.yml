@@ -42,6 +42,9 @@ jobs:
     # 安装脚本所需的依赖
     - name: Install requests
       run: pip install requests
+    
+    - name: Install lxml
+      run: pip install lxml
       
       # 运行脚本
     - name: 'Working1'
