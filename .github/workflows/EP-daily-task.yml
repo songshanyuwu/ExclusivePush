@@ -60,3 +60,9 @@ jobs:
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
         QMSGSCKEY: ${{ secrets.QMSGSCKEY }}
       run: python epidemicSsituation.py
+      
+      # 运行脚本
+    - name: 'Working3'
+      env:	#添加环境变量
+        PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
+      run: python news_plus.py
