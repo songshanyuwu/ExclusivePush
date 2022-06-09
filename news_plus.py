@@ -14,6 +14,7 @@ import json
 #     pip3 install  lxml yagmail -t .
 ###############################################
 
+PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
 
 # 设置请求头
 headers = {
@@ -25,8 +26,10 @@ headers = {
 # 获取日期
 timeStruct = time.localtime()
 strTime = time.strftime("%Y%m%d", timeStruct)
-#  如果是上午8点以后推送的，括号外的“-1”要删除
+# print(strTime)
+# 如果是上午8点以后推送的，括号外的“-1”要删除
 str_time = int(strTime)-1   
+# str_time = int(strTime)
 
 
 # 获取新闻
@@ -37,7 +40,8 @@ def hq_news():
     response.encoding = 'RGB'
     resp = response.text
     etr = etree.HTML(resp)
-    titles = etr.xpath("//div[@class='title']/text()")
+    # titles = etr.xpath("//div[@class='title']/text()")  #已经过期，网站页面调整，本次更新2022-01-23
+    titles = etr.xpath("//li/a/@title")
     hrefs = etr.xpath("//li/a/@href")
     i = 0 
     for title, href in zip(titles, hrefs):
@@ -45,7 +49,8 @@ def hq_news():
         news_response.encoding = 'RGB'
         news_resp = news_response.text
         # news_th = etree.HTML(news_resp).xpath('string(//*[@id="about_txt"]/div[2]/div)')
-        news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="about_txt"]/div[2]/div//text()')
+        # news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="about_txt"]/div[2]/div//text()')
+        news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="content_area"]/p[*]/text()')
         news_th = ""
         for i,n in enumerate(news_th_tmp):
             if i < 1:
@@ -53,14 +58,15 @@ def hq_news():
             else:
                 news_th = news_th + "<br>" + n
         # news.append(f"##{title}\n{news_th}\n##视频地址：{href}\n\n")
-        news.append(f"##{title}<br>{news_th}<br>##视频地址：{href}<br><br>")
+        # news.append(f"##{title}<br>{news_th}<br>##视频地址：{href}<br><br>")
+        news.append(f"<b>{title}</b><br>{news_th}<br><b>视频地址</b> <a href='{href}'>{href}</a><br><br>")
     return news
 
 # PushPlus推送
 def PushPlus(newstitle, newscontext):
     PushPlus = 'http://www.pushplus.plus/send'
     data = {
-        "token":"your_token",
+        "token":PUSHPLUSSCKEY,
         "title":newstitle,
         "content":newscontext,
         "template":"html"
@@ -69,14 +75,17 @@ def PushPlus(newstitle, newscontext):
     requests.post(url=PushPlus,data=body,headers=headers)
     return 'PushPlus推送成功'
 
-# 在服务器上用这个
-#if __name__ == '__main__':
+
 # 在腾讯云SCF用这个，这个函数名和执行方法有关系
 # (event, context)就这样写，也没有搞明白为什么这样写，可能云函数就是这样定义程序执行入口的
 # 难受的是这个一直没有从帮助文档上找到，可能人家以为这个忒简单了，┭┮﹏┭┮
-def main_handler(event, context):
+# def main_handler(event, context):
+
+# 在服务器上用这个
+if __name__ == '__main__':
     newstitle = str(str_time) + "新闻联播文字稿"
     news = hq_news()
+    # print(news)
     # newscontext = "".join(news)
     # 推送限制字符应该在10000一下，多了就丢弃不响应了；所以这里需要拆分一下，分成多个推送消息
     # 这里也是个坑，推送上没有说明，但是测试结果可以证实这一点
