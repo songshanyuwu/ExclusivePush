@@ -7,9 +7,15 @@ import os
 url = "https://c.m.163.com/ug/api/wuhan/app/data/list-total"
 
 pushplus_key = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
-server_key = os.environ.get('SERVERSCKEY')     ##Server酱推送KEY
-coolpush_key = os.environ.get('COOLSCKEY')     ##CoolPush酷推KEY
-qmsg_key = os.environ.get('QMSGSCKEY')         ##CoolPush酷推KEY
+
+
+def HtmlPuch_PushPlus(pneumoniaData): #PushPlus推送
+    token = pushplus_key #在pushplus网站中可以找到
+    title= '全国疫情数据实时统计' #改成你要的标题内容
+    content = pneumoniaData #改成你要的正文内容
+    url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={content}&template=html'
+    requests.get(url)
+    print(requests.get(url))
 
 
 #随机获取请求头
@@ -44,65 +50,23 @@ def Get_Url():  # sourcery skip: low-code-quality
                 '无症状感染者：' + str(line['extData']['noSymptom']) + ' ; ' + '较昨日：' + str(line['extData']['incrNoSymptom']) +'\n'
             for l2 in line['children'] :
                 if (l2['total']['confirm']-l2['total']['heal']-l2['total']['dead']) != 0:
-                    data2 = data2 + '\n✁-----------------------------------------\n' + \
-                         '省份  市区  现有明确  确诊  较昨日+  死亡  治愈\n' + \
-                        l2['name'] + '  ' + l2['name'] + '  ' + str(l2['total']['confirm']-l2['total']['heal']-l2['total']['dead']) + \
+                    data2 = data2 + '\n✁-----------------------------------\n' + \
+                         '省/市  现明确  确诊  较昨日+  死亡  治愈\n' + \
+                        l2['name'] + ':' + l2['name'] + '  ' + str(l2['today']['confirm']) + \
                          '  ' + str(l2['total']['confirm']) + '  ' + str(l2['today']['confirm']) + \
                          '  ' + str(l2['total']['dead']) + '  ' + str(l2['total']['heal'])
                 for l3 in l2['children']:
                     if (l3['total']['confirm']-l3['total']['heal']-l3['total']['dead']) != 0:
                         if l3['name'] == '未明确地区':
-                            l3['name']='未明地区'
+                            l3['name']='未明地'
                         data2 = data2 + '\n' + \
-                            l2['name'] + '  ' + l3['name'] + '  ' + str(l3['total']['confirm']-l3['total']['heal']-l3['total']['dead']) + \
+                            l2['name'] + '-' + l3['name'] + '  ' + str(l3['today']['confirm']) + \
                              '  ' + str(l3['total']['confirm']) + '  ' + str(l3['today']['confirm']) + \
                              '  ' + str(l3['total']['dead']) + '  ' + str(l3['total']['heal'])
-
-
     pneumoniaData = data + data2
     print(pneumoniaData)
-    select_robots(0,pneumoniaData) #3为Qmsg推送，1为酷推推送，2为server酱推送。默认为0
+    HtmlPuch_PushPlus(pneumoniaData)
     print('ok')
-
-
-def select_robots(i,pneumoniaData):
-    if i == 0:
-        HtmlPuch_PushPlus(pneumoniaData)
-    elif i == 1:
-        HtmlPuch_coolpush(pneumoniaData)
-    elif i == 2:
-        HtmlPuch_server(pneumoniaData)
-    elif i == 3:
-        HtmlPuch_Qmsg(pneumoniaData)
-    else:
-        print('选择错误!')
-
-
-#server酱推送
-def HtmlPuch_server(pneumoniaData):
-    url_key = f"https://sc.ftqq.com/{server_key}.send"
-    push_data = {'text': "全国疫情数据实时统计", 'desp': pneumoniaData}
-    html = requests.post(url_key, headers=UserAgent(), data=push_data)
-
-#酷推推送
-def HtmlPuch_coolpush(pneumoniaData):
-    url_key = f"https://push.xuthus.cc/send/{coolpush_key}"
-    push_data = {'c': pneumoniaData}
-    html = requests.get(url=url_key, params=push_data, headers=UserAgent())
-
-#Qmsg推送
-def HtmlPuch_Qmsg(pneumoniaData):
-    url_key = f"https://qmsg.zendee.cn/send/{qmsg_key}"
-    push_data = {'msg': pneumoniaData}
-    html = requests.get(url=url_key, params=push_data, headers=UserAgent())
-
-def HtmlPuch_PushPlus(pneumoniaData): #PushPlus推送
-    token = pushplus_key #在pushplus网站中可以找到
-    title= '全国疫情数据实时统计' #改成你要的标题内容
-    content = pneumoniaData #改成你要的正文内容
-    url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={content}&template=html'
-
-    requests.get(url)
 
 
 if __name__ == '__main__':
