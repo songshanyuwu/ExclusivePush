@@ -8,7 +8,7 @@ url = "https://c.m.163.com/ug/api/wuhan/app/data/list-total"
 
 pushplus_key = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
 server_key = os.environ.get('SERVERSCKEY')     ##Server酱推送KEY
-coolpush_key = os.environ.get('COOLSCKEY')         ##CoolPush酷推KEY
+coolpush_key = os.environ.get('COOLSCKEY')     ##CoolPush酷推KEY
 qmsg_key = os.environ.get('QMSGSCKEY')         ##CoolPush酷推KEY
 
 
@@ -30,7 +30,6 @@ def UserAgent():
 def Get_Url():  # sourcery skip: low-code-quality
     url_json = requests.get(url=url,headers=UserAgent()).json()
     # print(data)
-
     # 遍历列表字典，重新获取地区或者省市数据
     data2 = ''
     for line in url_json['data']['areaTree']:
