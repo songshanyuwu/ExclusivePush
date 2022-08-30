@@ -53,18 +53,18 @@ def Get_Url():  # sourcery skip: low-code-quality
                 if (l2['total']['confirm']-l2['total']['heal']-l2['total']['dead']) != 0:
                     data2 = data2 + '\n✁-----------------------------------\n' + \
                          '省/市-现明确-总确诊-较昨日+ 死亡-治愈\n' + \
-                        l2['name'] + ':' + l2['name'] + '  ' + str(l2['today']['confirm']) + \
-                         '  ' + str(l2['total']['confirm']) + '  ' + str(l2['today']['confirm']) + \
-                         '  ' + str(l2['total']['dead']) + '  ' + str(l2['total']['heal'])
+                        l2['name'] + ':' + l2['name'] + '    ' + str(l2['today']['confirm']) + \
+                         '    ' + str(l2['total']['confirm']) + '    ' + str(l2['today']['confirm']) + \
+                         '    ' + str(l2['total']['dead']) + '    ' + str(l2['total']['heal'])
                 for l3 in l2['children']:
                     if (l3['total']['confirm']-l3['total']['heal']-l3['total']['dead']) != 0:
                         if l3['today']['confirm'] != 0:
                             if l3['name'] == '未明确地区':
                                 l3['name']='未明地'
                             data2 = data2 + '\n' + \
-                                l2['name'] + '-' + l3['name'] + '  ' + str(l3['today']['confirm']) + \
-                                '  ' + str(l3['total']['confirm']) + '  ' + str(l3['today']['confirm']) + \
-                                '  ' + str(l3['total']['dead']) + '  ' + str(l3['total']['heal'])
+                                l2['name'] + '-' + l3['name'] + '    ' + str(l3['today']['confirm']) + \
+                                '    ' + str(l3['total']['confirm']) + '    ' + str(l3['today']['confirm']) + \
+                                '    ' + str(l3['total']['dead']) + '    ' + str(l3['total']['heal'])
 
 
     pneumoniaData = data + data2
