@@ -36,6 +36,7 @@ def UserAgent():
 def Get_Url():  # sourcery skip: low-code-quality
     url_json = requests.get(url=url,headers=UserAgent()).json()
     # print(data)
+
     # 遍历列表字典，重新获取地区或者省市数据
     data2 = ''
     for line in url_json['data']['areaTree']:
@@ -51,20 +52,24 @@ def Get_Url():  # sourcery skip: low-code-quality
             for l2 in line['children'] :
                 if (l2['total']['confirm']-l2['total']['heal']-l2['total']['dead']) != 0:
                     data2 = data2 + '\n✁-----------------------------------\n' + \
-                         '省/市  现明确  确诊  较昨日+  死亡  治愈\n' + \
+                         '省/市-现明确-总确诊-较昨日+ 死亡-治愈\n' + \
                         l2['name'] + ':' + l2['name'] + '  ' + str(l2['today']['confirm']) + \
                          '  ' + str(l2['total']['confirm']) + '  ' + str(l2['today']['confirm']) + \
                          '  ' + str(l2['total']['dead']) + '  ' + str(l2['total']['heal'])
                 for l3 in l2['children']:
                     if (l3['total']['confirm']-l3['total']['heal']-l3['total']['dead']) != 0:
-                        if l3['name'] == '未明确地区':
-                            l3['name']='未明地'
-                        data2 = data2 + '\n' + \
-                            l2['name'] + '-' + l3['name'] + '  ' + str(l3['today']['confirm']) + \
-                             '  ' + str(l3['total']['confirm']) + '  ' + str(l3['today']['confirm']) + \
-                             '  ' + str(l3['total']['dead']) + '  ' + str(l3['total']['heal'])
+                        if l3['today']['confirm'] != 0:
+                            if l3['name'] == '未明确地区':
+                                l3['name']='未明地'
+                            data2 = data2 + '\n' + \
+                                l2['name'] + '-' + l3['name'] + '  ' + str(l3['today']['confirm']) + \
+                                '  ' + str(l3['total']['confirm']) + '  ' + str(l3['today']['confirm']) + \
+                                '  ' + str(l3['total']['dead']) + '  ' + str(l3['total']['heal'])
+
+
     pneumoniaData = data + data2
     print(pneumoniaData)
+    print(len(pneumoniaData))
     HtmlPuch_PushPlus(pneumoniaData)
     print('ok')
 
