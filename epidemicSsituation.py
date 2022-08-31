@@ -5,17 +5,21 @@ import requests,random,json
 import os
 
 url = "https://c.m.163.com/ug/api/wuhan/app/data/list-total"
+##PUSHPLUS推送KEY
+pushplus_key = os.environ.get('PUSHPLUSSCKEY')
 
-pushplus_key = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
-
-
-def HtmlPuch_PushPlus(pneumoniaData): #PushPlus推送
-    token = pushplus_key #在pushplus网站中可以找到
-    title= '全国疫情数据实时统计' #改成你要的标题内容
-    content = pneumoniaData #改成你要的正文内容
-    url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={content}&template=html'
+#PushPlus推送
+def HtmlPuch_PushPlus(pneumoniaData):
+    #在pushplus网站中可以找到
+    token = pushplus_key
+    #改成你要的标题内容
+    title= '全国疫情数据实时统计'
+    #改成你要的正文内容
+    content = pneumoniaData
+    #url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={content}&template=html'
+    url = 'http://www.pushplus.plus/send?token='+token+'&title='+title+'&content='+content+'&template=html'
     requests.get(url)
-    print(requests.get(url))
+    #print(requests.get(url))
 
 
 #随机获取请求头
@@ -36,7 +40,6 @@ def UserAgent():
 def Get_Url():  # sourcery skip: low-code-quality
     url_json = requests.get(url=url,headers=UserAgent()).json()
     # print(data)
-
     # 遍历列表字典，重新获取地区或者省市数据
     data2 = ''
     for line in url_json['data']['areaTree']:
@@ -65,10 +68,8 @@ def Get_Url():  # sourcery skip: low-code-quality
                                 l2['name'] + '-' + l3['name'] + '    ' + str(l3['today']['confirm']) + \
                                 '    ' + str(l3['total']['confirm']) + '    ' + str(l3['today']['confirm']) + \
                                 '    ' + str(l3['total']['dead']) + '    ' + str(l3['total']['heal'])
-
-
     pneumoniaData = data + data2
-    print(pneumoniaData)
+    #print(pneumoniaData)
     print(len(pneumoniaData))
     HtmlPuch_PushPlus(pneumoniaData)
     print('ok')
