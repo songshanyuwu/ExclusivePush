@@ -112,7 +112,7 @@ def weather2(city_code):
 
 
 def get_dict(d1, d2):
-    return {a: dict(c.items()+d.items()) if 所有(不 isinstance(h, dict) for _, h in c.items()) 和 所有(不 isinstance(h, dict) for _, h in d.items()) else get_dict(c, d) for (a, c), (_, d) in zip(d1.items(), d2.items())}
+    return {a: dict(c.items()+d.items()) if all(not isinstance(h, dict) for _, h in c.items()) and all(not isinstance(h, dict) for _, h in d.items()) else get_dict(c, d) for (a, c), (_, d) in zip(d1.items(), d2.items())}
 
 def main():
     # 只查询一个地区的天气，建议使用PushPlus的json  需要传参dist
