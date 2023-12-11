@@ -121,7 +121,7 @@ def main():
     # # print(str(weatherContent1))
     # PushPlus(str(weatherContent1))
 
-    city_codes = ['101120101', '101121201', '101010300', '101120504']
+    city_codes = ['101120101', '101120504', '101121201', '101010300']
     #  city_codes = ['101120101', '101120504']
     weatherContent2 = ''
     for item in city_codes:
