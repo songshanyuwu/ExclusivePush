@@ -93,8 +93,11 @@ def hq_news():
                 result += f"<b>{strong_elements[0]}</b><br>"
             # 处理 p 元素
             if p_elements and p_elements[0]!= "（新闻联播）：":
-                result += f"{p_elements[0]}<br>"
-        # news.append(f"<b>{title}</b><br>{result}<br><b>视频地址</b> <a href='{href}'>{href}</a><br><br>")
+                # result += f"{p_elements[0]}<br>"
+                # 在 p 元素开头添加两个空格
+                p_text = "&nbsp;&nbsp;" + p_elements[0].strip()  
+                result += f"{p_text}<br>"
+        # news.append(f"<b>{title}</b><br>{result}<br><b>视频地址</b> <a href='{href}'>{href}</a><br>")
         news.append(f"<b>{title}</b><br>{result}<br><br>")
     return news
 
