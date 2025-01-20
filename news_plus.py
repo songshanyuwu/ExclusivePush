@@ -81,12 +81,6 @@ def hq_news():
         news_response.encoding = 'RGB'
         news_resp = news_response.text
         etr_news = etree.HTML(news_resp)
-        # news_th = etree.HTML(news_resp).xpath('string(//*[@id="about_txt"]/div[2]/div)')
-        # news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="about_txt"]/div[2]/div//text()')
-        # # 提取 strong 元素的文本内容
-        # news_strong_tmp = etree.HTML(news_resp).xpath('//div[@id="content_area"]/p/strong/text()')
-        # # 提取 p 元素下的普通文本内容
-        # news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="content_area"]/p/text()')
         
         # 提取包含 strong 和 p 元素的 div 元素
         div_elements = etr_news.xpath('//div[@id="content_area"]/p')
@@ -95,13 +89,13 @@ def hq_news():
             strong_elements = div_element.xpath('strong/text()')
             p_elements = div_element.xpath('text()')
             # 处理 strong 元素
-            if strong_elements:
+            if strong_elements and strong_elements[0]!= "央视网消息":
                 result += f"<b>{strong_elements[0]}</b><br>"
             # 处理 p 元素
-            if p_elements:
+            if p_elements and p_elements[0]!= "（新闻联播）：":
                 result += f"{p_elements[0]}<br>"
-
-        news.append(f"<b>{title}</b><br>{result}<br><b>视频地址</b> <a href='{href}'>{href}</a><br><br>")
+        # news.append(f"<b>{title}</b><br>{result}<br><b>视频地址</b> <a href='{href}'>{href}</a><br><br>")
+        news.append(f"<b>{title}</b><br>{result}<br><br>")
     return news
 
 # PushPlus推送
