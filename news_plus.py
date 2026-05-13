@@ -2,6 +2,7 @@
 """
 新闻联播文字稿抓取与推送 - 优化版
 功能：异步并发抓取、自动目录、视频链接、美化显示、完整错误处理
+注意：所有样式使用内联样式，确保 PushPlus 正常显示
 """
 
 import asyncio
@@ -39,6 +40,92 @@ TIMEOUT = aiohttp.ClientTimeout(total=30)  # 总超时30秒
 MAX_CONCURRENT = 5  # 最大并发数
 RETRY_TIMES = 3  # 重试次数
 
+# ==================== 内联样式定义 ====================
+
+STYLE_CONTAINER = '''
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+line-height: 1.8;
+color: #333;
+max-width: 100%;
+word-wrap: break-word;
+'''.strip()
+
+STYLE_TOC = '''
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+color: white;
+padding: 20px;
+border-radius: 12px;
+margin-bottom: 20px;
+'''.strip()
+
+STYLE_TOC_TITLE = '''
+font-size: 18px;
+font-weight: bold;
+margin-bottom: 12px;
+'''.strip()
+
+STYLE_TOC_LIST = '''
+columns: 2;
+column-gap: 20px;
+'''.strip()
+
+STYLE_TOC_ITEM = '''
+break-inside: avoid;
+padding: 6px 0;
+font-size: 14px;
+'''.strip()
+
+STYLE_NEWS_ITEM = '''
+background: #f8f9fa;
+border-radius: 10px;
+padding: 16px 20px;
+margin-bottom: 16px;
+border-left: 4px solid #667eea;
+'''.strip()
+
+STYLE_NEWS_TITLE = '''
+font-size: 16px;
+font-weight: bold;
+color: #1a1a1a;
+margin-bottom: 12px;
+display: flex;
+align-items: flex-start;
+gap: 8px;
+flex-wrap: wrap;
+'''.strip()
+
+STYLE_NEWS_INDEX = '''
+background: #667eea;
+color: white;
+min-width: 28px;
+height: 24px;
+border-radius: 50%;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+font-size: 12px;
+flex-shrink: 0;
+padding: 0 4px;
+'''.strip()
+
+STYLE_VIDEO_LINK = '''
+background: #ff4757;
+color: white;
+padding: 4px 12px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: normal;
+text-decoration: none;
+margin-left: auto;
+flex-shrink: 0;
+'''.strip()
+
+STYLE_NEWS_CONTENT = '''
+color: #555;
+font-size: 14px;
+line-height: 2;
+'''.strip()
+
 # ==================== 数据结构 ====================
 
 @dataclass
@@ -50,17 +137,17 @@ class NewsItem:
     index: int = 0  # 目录索引
 
     def to_html(self) -> str:
-        """转换为HTML格式"""
-        return f"""
-<div class="news-item" id="news-{self.index}">
-    <div class="news-title">
-        <span class="news-index">{self.index}️⃣</span>
+        """转换为HTML格式（使用内联样式）"""
+        return f'''
+<div style="{STYLE_NEWS_ITEM}">
+    <div style="{STYLE_NEWS_TITLE}">
+        <span style="{STYLE_NEWS_INDEX}">{self.index}️⃣</span>
         <b>{escape(self.title)}</b>
-        <a href="{escape(self.video_url)}" class="video-link" target="_blank">🎬 视频</a>
+        <a href="{escape(self.video_url)}" style="{STYLE_VIDEO_LINK}" target="_blank">🎬 视频</a>
     </div>
-    <div class="news-content">{self.content}</div>
+    <div style="{STYLE_NEWS_CONTENT}">{self.content}</div>
 </div>
-        """.strip()
+        '''.strip()
 
 
 @dataclass
@@ -79,123 +166,23 @@ class NewsList:
         # 生成正文
         content = self._generate_content()
 
-        return f"""
-<style>
-    .news-container {{
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        line-height: 1.8;
-        color: #333;
-        max-width: 100%;
-        word-wrap: break-word;
-    }}
-    .toc {{
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-    }}
-    .toc-title {{
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }}
-    .toc-list {{
-        columns: 2;
-        column-gap: 20px;
-    }}
-    .toc-item {{
-        break-inside: avoid;
-        padding: 6px 0;
-        font-size: 14px;
-    }}
-    .toc-item a {{
-        color: white;
-        text-decoration: none;
-        opacity: 0.9;
-    }}
-    .toc-item a:hover {{
-        opacity: 1;
-        text-decoration: underline;
-    }}
-    .news-item {{
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 16px 20px;
-        margin-bottom: 16px;
-        border-left: 4px solid #667eea;
-    }}
-    .news-title {{
-        font-size: 16px;
-        font-weight: bold;
-        color: #1a1a1a;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        flex-wrap: wrap;
-    }}
-    .news-index {{
-        background: #667eea;
-        color: white;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        flex-shrink: 0;
-    }}
-    .video-link {{
-        background: #ff4757;
-        color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: normal;
-        text-decoration: none;
-        margin-left: auto;
-        flex-shrink: 0;
-    }}
-    .video-link:hover {{
-        background: #ff6b81;
-    }}
-    .news-content {{
-        color: #555;
-        font-size: 14px;
-        line-height: 2;
-    }}
-    .news-content b {{
-        color: #333;
-    }}
-    @media (max-width: 600px) {{
-        .toc-list {{
-            columns: 1;
-        }}
-    }}
-</style>
-
-<div class="news-container">
-    <div class="toc">
-        <div class="toc-title">📋 今日目录（共{len(self.items)}条）</div>
-        <div class="toc-list">
+        return f'''
+<div style="{STYLE_CONTAINER}">
+    <div style="{STYLE_TOC}">
+        <div style="{STYLE_TOC_TITLE}">📋 今日目录（共{len(self.items)}条）</div>
+        <div style="{STYLE_TOC_LIST}">
             {toc}
         </div>
     </div>
     {content}
 </div>
-        """
+        '''.strip()
 
     def _generate_toc(self) -> str:
         """生成目录HTML"""
         toc_items = []
         for item in self.items:
-            anchor = f"news-{item.index}"
-            toc_items.append(f'<div class="toc-item"><a href="#{anchor}">{item.index}️⃣ {escape(item.title)}</a></div>')
+            toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}️⃣ {escape(item.title)}</div>')
         return '\n'.join(toc_items)
 
     def _generate_content(self) -> str:
@@ -399,119 +386,8 @@ def PushPlus(newstitle: str, newscontext: str) -> bool:
         return False
 
 
-def get_base_style() -> str:
-    """获取基础样式（用于后续批次的推送）"""
-    return """
-<style>
-    .news-container {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        line-height: 1.8;
-        color: #333;
-        max-width: 100%;
-        word-wrap: break-word;
-    }
-    .news-item {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 16px 20px;
-        margin-bottom: 16px;
-        border-left: 4px solid #667eea;
-    }
-    .news-title {
-        font-size: 16px;
-        font-weight: bold;
-        color: #1a1a1a;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-    .news-index {
-        background: #667eea;
-        color: white;
-        min-width: 28px;
-        height: 24px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        flex-shrink: 0;
-        padding: 0 4px;
-    }
-    .video-link {
-        background: #ff4757;
-        color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: normal;
-        text-decoration: none;
-        margin-left: auto;
-        flex-shrink: 0;
-    }
-    .video-link:hover {
-        background: #ff6b81;
-    }
-    .news-content {
-        color: #555;
-        font-size: 14px;
-        line-height: 2;
-    }
-    .news-content b {
-        color: #333;
-    }
-</style>
-    """.strip()
-
-
-def get_toc_style() -> str:
-    """获取目录样式"""
-    return """
-    .toc {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-    }
-    .toc-title {
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .toc-list {
-        columns: 2;
-        column-gap: 20px;
-    }
-    .toc-item {
-        break-inside: avoid;
-        padding: 6px 0;
-        font-size: 14px;
-    }
-    .toc-item a {
-        color: white;
-        text-decoration: none;
-        opacity: 0.9;
-    }
-    .toc-item a:hover {
-        opacity: 1;
-        text-decoration: underline;
-    }
-    @media (max-width: 600px) {
-        .toc-list {
-            columns: 1;
-        }
-    }
-    """.strip()
-
-
 def split_and_push(newstitle: str, news_list: NewsList, max_length: int = 8800) -> bool:
-    """分批推送超长内容 - 按新闻项完整分割，每批都有美化效果"""
+    """分批推送超长内容 - 按新闻项完整分割，每批都有美化效果（使用内联样式）"""
     if not news_list.items:
         logger.warning("没有新闻内容需要推送")
         return False
@@ -560,8 +436,16 @@ def split_and_push(newstitle: str, news_list: NewsList, max_length: int = 8800) 
 
     logger.info(f"将分为 {len(batches)} 批推送")
 
-    # 生成完整样式（包含目录）
-    full_style = get_base_style() + "\n    " + get_toc_style()
+    # 后续批次的标题样式
+    STYLE_TOC_CONTINUE = '''
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+color: white;
+padding: 15px 20px;
+border-radius: 12px;
+margin-bottom: 20px;
+font-size: 16px;
+font-weight: bold;
+    '''.strip()
 
     # 推送所有批次
     success = True
@@ -571,42 +455,32 @@ def split_and_push(newstitle: str, news_list: NewsList, max_length: int = 8800) 
 
         # 构建该批次的 HTML
         if batch_idx == 0:
-            # 第一批：包含完整样式和目录
+            # 第一批：包含完整目录
             batch_items = [news_list.items[i] for i in batch_indices]
             toc = _generate_toc_for_batch(batch_items)
             content = '\n'.join([news_list.items[i].to_html() for i in batch_indices])
 
-            batch_html = f"""
-<style>
-{full_style}
-</style>
-<div class="news-container">
-    <div class="toc">
-        <div class="toc-title">📋 今日目录（共{len(news_list.items)}条，第{len(batches)}批）</div>
-        <div class="toc-list">
+            batch_html = f'''
+<div style="{STYLE_CONTAINER}">
+    <div style="{STYLE_TOC}">
+        <div style="{STYLE_TOC_TITLE}">📋 今日目录（共{len(news_list.items)}条，第{len(batches)}批）</div>
+        <div style="{STYLE_TOC_LIST}">
             {toc}
         </div>
     </div>
     {content}
 </div>
-            """.strip()
+            '''.strip()
         else:
-            # 后续批次：只包含样式和正文（不含目录，但包含查看全部的提示）
+            # 后续批次：只包含标题和正文
             content = '\n'.join([news_list.items[i].to_html() for i in batch_indices])
 
-            batch_html = f"""
-<style>
-{get_base_style()}
-</style>
-<div class="news-container">
-    <div class="toc" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px;">
-        <div style="font-size: 16px; font-weight: bold;">
-            📰 续-{batch_idx + 1}（共{len(batches)}批，第{batch_idx + 1}批）
-        </div>
-    </div>
+            batch_html = f'''
+<div style="{STYLE_CONTAINER}">
+    <div style="{STYLE_TOC_CONTINUE}">📰 续-{batch_idx + 1}（共{len(batches)}批，第{batch_idx + 1}批）</div>
     {content}
 </div>
-            """.strip()
+            '''.strip()
 
         if not PushPlus(batch_title, batch_html):
             success = False
@@ -619,7 +493,7 @@ def _generate_toc_for_batch(items: List[NewsItem]) -> str:
     """为一批新闻生成目录HTML"""
     toc_items = []
     for item in items:
-        toc_items.append(f'<div class="toc-item"><a href="#news-{item.index}">{item.index}️⃣ {escape(item.title)}</a></div>')
+        toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}️⃣ {escape(item.title)}</div>')
     return '\n'.join(toc_items)
 
 
@@ -650,9 +524,6 @@ async def main():
     if not news_list.items:
         logger.warning("没有获取到任何新闻内容")
         return
-
-    # 生成HTML
-    # html_content = news_list.to_html()
 
     # 推送（使用按新闻项分割的方式，每批都有美化效果）
     newstitle = f"{date_str} 新闻联播文字稿"
