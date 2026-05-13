@@ -199,12 +199,11 @@ def weather_to_html(data: Dict) -> str:
 <div style="{STYLE_CITY_CARD}">
     <div style="{STYLE_CITY_HEADER}">
         <div style="{STYLE_CITY_NAME}">📍 {city_info["parent"]} {city_info["city"]}</div>
+        <div style="color: #ff6b6b; font-size: 16px; font-weight: bold; margin-bottom: 12px;">{today["type"]}</div>
         <div style="{STYLE_WEATHER_ICON}">{weather_icon}</div>
     </div>
     
     <div style="{STYLE_TEMP}">{today["high"]} / {today["low"]}</div>
-    
-    <div style="color: #ff6b6b; font-size: 16px; font-weight: bold; margin-bottom: 12px;">{today["type"]}</div>
     
     <div style="{STYLE_INFO_GRID}">
         <div style="{STYLE_INFO_ITEM}">
@@ -232,7 +231,10 @@ def weather_to_html(data: Dict) -> str:
     <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
         昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]}
     </div>
-     <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
+    <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
+        今日日: {today["high"]} / {today["low"]} {today["type"]}
+    </div>
+    <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
         明日: {tomorrow["high"]} / {tomorrow["low"]} {tomorrow["type"]}
     </div>
 </div>
