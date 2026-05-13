@@ -52,7 +52,7 @@ class NewsItem:
     def to_html(self) -> str:
         """转换为HTML格式"""
         return f"""
-<div class="news-item">
+<div class="news-item" id="news-{self.index}">
     <div class="news-title">
         <span class="news-index">{self.index}️⃣</span>
         <b>{escape(self.title)}</b>
@@ -399,49 +399,228 @@ def PushPlus(newstitle: str, newscontext: str) -> bool:
         return False
 
 
-def split_and_push(newstitle: str, html_content: str, max_length: int = 8800) -> bool:
-    """分批推送超长内容"""
-    # 计算实际内容长度（去掉HTML标签后）
-    text_only = re.sub(r'<[^>]+>', '', html_content)
+def get_base_style() -> str:
+    """获取基础样式（用于后续批次的推送）"""
+    return """
+<style>
+    .news-container {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.8;
+        color: #333;
+        max-width: 100%;
+        word-wrap: break-word;
+    }
+    .news-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        border-left: 4px solid #667eea;
+    }
+    .news-title {
+        font-size: 16px;
+        font-weight: bold;
+        color: #1a1a1a;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .news-index {
+        background: #667eea;
+        color: white;
+        min-width: 28px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        flex-shrink: 0;
+        padding: 0 4px;
+    }
+    .video-link {
+        background: #ff4757;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: normal;
+        text-decoration: none;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+    .video-link:hover {
+        background: #ff6b81;
+    }
+    .news-content {
+        color: #555;
+        font-size: 14px;
+        line-height: 2;
+    }
+    .news-content b {
+        color: #333;
+    }
+</style>
+    """.strip()
 
+
+def get_toc_style() -> str:
+    """获取目录样式"""
+    return """
+    .toc {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }
+    .toc-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .toc-list {
+        columns: 2;
+        column-gap: 20px;
+    }
+    .toc-item {
+        break-inside: avoid;
+        padding: 6px 0;
+        font-size: 14px;
+    }
+    .toc-item a {
+        color: white;
+        text-decoration: none;
+        opacity: 0.9;
+    }
+    .toc-item a:hover {
+        opacity: 1;
+        text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+        .toc-list {
+            columns: 1;
+        }
+    }
+    """.strip()
+
+
+def split_and_push(newstitle: str, news_list: NewsList, max_length: int = 8800) -> bool:
+    """分批推送超长内容 - 按新闻项完整分割，每批都有美化效果"""
+    if not news_list.items:
+        logger.warning("没有新闻内容需要推送")
+        return False
+
+    # 计算总文本长度
+    total_html = news_list.to_html()
+    text_only = re.sub(r'<[^>]+>', '', total_html)
+
+    # 如果总长度在限制内，直接推送完整版
     if len(text_only) < max_length:
-        return PushPlus(newstitle, html_content)
+        return PushPlus(newstitle, total_html)
 
-    # 需要分批推送
-    logger.info(f"内容较长（{len(text_only)}字符），开始分批推送...")
+    # 需要分批推送 - 按新闻项完整分割
+    logger.info(f"内容较长（{len(text_only)}字符），开始按新闻项分批推送...")
 
-    # 分割新闻项
-    news_blocks = re.split(r'(<div class="news-item">)', html_content)
-    batches = []
-    current_batch = ""
+    # 收集每条新闻的 HTML 和长度
+    news_htmls = []
+    for item in news_list.items:
+        news_htmls.append({
+            'html': item.to_html(),
+            'length': len(re.sub(r'<[^>]+>', '', item.to_html()))
+        })
+
+    # 将新闻分配到各批次（确保每条新闻完整不拆分）
+    batches = []  # 每个元素是一个列表，包含该批次的新闻索引
+    current_batch = []
     current_length = 0
 
-    for i, block in enumerate(news_blocks):
-        if not block.strip():
-            continue
+    for i, news in enumerate(news_htmls):
+        # 检查如果加上这条新闻会不会超限
+        # 留一些余量给样式和包装
+        needed_length = current_length + news['length'] + 500
 
-        block_length = len(re.sub(r'<[^>]+>', '', block))
-
-        if current_length + block_length > max_length and current_batch:
+        if needed_length > max_length and current_batch:
+            # 保存当前批次，开始新批次
             batches.append(current_batch)
-            current_batch = ""
-            current_length = 0
+            current_batch = [i]
+            current_length = news['length']
+        else:
+            current_batch.append(i)
+            current_length += news['length']
 
-        current_batch += block
-        current_length += block_length
-
+    # 添加最后一批
     if current_batch:
         batches.append(current_batch)
 
+    logger.info(f"将分为 {len(batches)} 批推送")
+
+    # 生成完整样式（包含目录）
+    full_style = get_base_style() + "\n    " + get_toc_style()
+
     # 推送所有批次
     success = True
-    for i, batch in enumerate(batches):
-        batch_title = f"{newstitle} ({i+1}/{len(batches)})"
-        logger.info(f"推送第 {i+1}/{len(batches)} 批...")
-        if not PushPlus(batch_title, batch):
+    for batch_idx, batch_indices in enumerate(batches):
+        batch_title = f"{newstitle} ({batch_idx + 1}/{len(batches)}) 📺"
+        logger.info(f"推送第 {batch_idx + 1}/{len(batches)} 批，包含 {len(batch_indices)} 条新闻...")
+
+        # 构建该批次的 HTML
+        if batch_idx == 0:
+            # 第一批：包含完整样式和目录
+            batch_items = [news_list.items[i] for i in batch_indices]
+            toc = _generate_toc_for_batch(batch_items)
+            content = '\n'.join([news_list.items[i].to_html() for i in batch_indices])
+
+            batch_html = f"""
+<style>
+{full_style}
+</style>
+<div class="news-container">
+    <div class="toc">
+        <div class="toc-title">📋 今日目录（共{len(news_list.items)}条，第{len(batches)}批）</div>
+        <div class="toc-list">
+            {toc}
+        </div>
+    </div>
+    {content}
+</div>
+            """.strip()
+        else:
+            # 后续批次：只包含样式和正文（不含目录，但包含查看全部的提示）
+            content = '\n'.join([news_list.items[i].to_html() for i in batch_indices])
+
+            batch_html = f"""
+<style>
+{get_base_style()}
+</style>
+<div class="news-container">
+    <div class="toc" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px;">
+        <div style="font-size: 16px; font-weight: bold;">
+            📰 续-{batch_idx + 1}（共{len(batches)}批，第{batch_idx + 1}批）
+        </div>
+    </div>
+    {content}
+</div>
+            """.strip()
+
+        if not PushPlus(batch_title, batch_html):
             success = False
+            logger.error(f"第 {batch_idx + 1} 批推送失败")
 
     return success
+
+
+def _generate_toc_for_batch(items: List[NewsItem]) -> str:
+    """为一批新闻生成目录HTML"""
+    toc_items = []
+    for item in items:
+        toc_items.append(f'<div class="toc-item"><a href="#news-{item.index}">{item.index}️⃣ {escape(item.title)}</a></div>')
+    return '\n'.join(toc_items)
 
 
 # ==================== 主程序 ====================
@@ -473,11 +652,11 @@ async def main():
         return
 
     # 生成HTML
-    html_content = news_list.to_html()
+    # html_content = news_list.to_html()
 
-    # 推送
-    newstitle = f"{date_str} 新闻联播文字稿 📺"
-    success = split_and_push(newstitle, html_content)
+    # 推送（使用按新闻项分割的方式，每批都有美化效果）
+    newstitle = f"{date_str} 新闻联播文字稿"
+    success = split_and_push(newstitle, news_list)
 
     # 统计
     elapsed = time.time() - start_time
