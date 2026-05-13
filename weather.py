@@ -230,7 +230,9 @@ def weather_to_html(data: Dict) -> str:
     </div>
     
     <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
-        昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]}　|　
+        昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]}
+    </div>
+     <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
         明日: {tomorrow["high"]} / {tomorrow["low"]} {tomorrow["type"]}
     </div>
 </div>
