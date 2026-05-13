@@ -46,6 +46,14 @@ jobs:
     - name: Install lxml
       run: pip install lxml
       
+    # 安装 aiohttp（异步并发） - 新闻联播脚本优化所需
+    - name: Install aiohttp
+      run: pip install aiohttp
+      
+    # 安装 tenacity（重试机制） - 新闻联播脚本优化所需
+    - name: Install tenacity
+      run: pip install tenacity
+      
       # 运行脚本
     - name: 'Working1'
       env:	#添加环境变量
