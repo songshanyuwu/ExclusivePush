@@ -386,14 +386,19 @@ def PushPlus(newstitle: str, newscontext: str) -> bool:
         return False
 
 
-def split_and_push(newstitle: str, news_list: NewsList, max_html_length: int = 8000) -> bool:
+def split_and_push(newstitle: str, news_list: NewsList, max_html_length: int = None) -> bool:
     """分批推送超长内容 - 按新闻项完整分割，每批都有美化效果（使用内联样式）
     
     Args:
         newstitle: 推送标题
         news_list: 新闻列表
-        max_html_length: 每批HTML最大字符数（默认8000，PushPlus限制约8800，留800余量）
+        max_html_length: 每批HTML最大字符数（默认从环境变量 PUSHPLUS_MAX_LENGTH 读取，未设置则使用40000）
     """
+    # 从环境变量读取最大长度，未设置则使用默认值40000
+    if max_html_length is None:
+        max_html_length = int(os.environ.get('PUSHPLUS_MAX_LENGTH', '40000'))
+    
+    logger.info(f"分批推送设置：max_html_length={max_html_length}")
     if not news_list.items:
         logger.warning("没有新闻内容需要推送")
         return False
@@ -463,20 +468,19 @@ font-weight: bold;
     # 推送所有批次
     success = True
     for batch_idx, batch_indices in enumerate(batches):
-        batch_title = f"{newstitle} ({batch_idx + 1}/{len(batches)}) 📺"
+        batch_title = f"{newstitle} ({batch_idx + 1}/{len(batches)}) "
         logger.info(f"推送第 {batch_idx + 1}/{len(batches)} 批，包含 {len(batch_indices)} 条新闻...")
 
         # 构建该批次的 HTML
         if batch_idx == 0:
-            # 第一批：包含完整目录
-            batch_items = [news_list.items[i] for i in batch_indices]
-            toc = _generate_toc_for_batch(batch_items)
+            # 第一批：包含完整目录（显示全部新闻标题）
+            toc = _generate_toc_for_batch(news_list.items)  # 显示全部新闻目录
             content = '\n'.join([news_list.items[i].to_html() for i in batch_indices])
 
             batch_html = f'''
 <div style="{STYLE_CONTAINER}">
     <div style="{STYLE_TOC}">
-        <div style="{STYLE_TOC_TITLE}">📋 今日目录（共{len(news_list.items)}条，第{len(batches)}批）</div>
+        <div style="{STYLE_TOC_TITLE}">📋 今日目录（共{len(news_list.items)}条）</div>
         <div style="{STYLE_TOC_LIST}">
             {toc}
         </div>
