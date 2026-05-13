@@ -65,14 +65,14 @@ margin-bottom: 12px;
 '''.strip()
 
 STYLE_TOC_LIST = '''
-columns: 2;
-column-gap: 20px;
+margin: 0;
+padding: 0 0 0 20px;
 '''.strip()
 
 STYLE_TOC_ITEM = '''
-break-inside: avoid;
-padding: 6px 0;
+padding: 4px 0;
 font-size: 14px;
+line-height: 1.4;
 '''.strip()
 
 STYLE_NEWS_ITEM = '''
@@ -141,7 +141,7 @@ class NewsItem:
         return f'''
 <div style="{STYLE_NEWS_ITEM}">
     <div style="{STYLE_NEWS_TITLE}">
-        <span style="{STYLE_NEWS_INDEX}">{self.index}️⃣</span>
+        <span style="{STYLE_NEWS_INDEX}">{self.index}📰</span>
         <b>{escape(self.title)}</b>
         <a href="{escape(self.video_url)}" style="{STYLE_VIDEO_LINK}" target="_blank">🎬 视频</a>
     </div>
@@ -182,7 +182,7 @@ class NewsList:
         """生成目录HTML"""
         toc_items = []
         for item in self.items:
-            toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}️⃣ {escape(item.title)}</div>')
+            toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}📰 {escape(item.title)}</div>')
         return '\n'.join(toc_items)
 
     def _generate_content(self) -> str:
@@ -230,6 +230,10 @@ def parse_list_page(html: str) -> List[Dict[str, str]]:
         news_list = []
         for title, href in zip(titles, hrefs):
             if title and href:
+                # 跳过第一条"《新闻联播》日期 21:00"
+                if '《新闻联播》' in title or '新闻联播' in title[:10]:
+                    logger.debug(f"跳过引导性标题: {title}")
+                    continue
                 # 处理相对链接
                 if href.startswith('/'):
                     href = 'https://tv.cctv.com' + href
@@ -513,7 +517,7 @@ def _generate_toc_for_batch(items: List[NewsItem]) -> str:
     """为一批新闻生成目录HTML"""
     toc_items = []
     for item in items:
-        toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}️⃣ {escape(item.title)}</div>')
+        toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}📰 {escape(item.title)}</div>')
     return '\n'.join(toc_items)
 
 
