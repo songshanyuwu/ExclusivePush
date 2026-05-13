@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 天气推送脚本 - 优化版
-功能：并发获取多城市天气、精美HTML展示、完整错误处理、兼容PushPlus
+功能：获取多城市天气、精美HTML展示、完整错误处理、兼容PushPlus
+注意：使用同步请求（城市数量少，无需异步）
 """
 
-import asyncio
-import aiohttp
 import logging
 import os
+import time
 import requests
 import json
 from typing import List, Dict, Optional
@@ -25,10 +25,6 @@ logger = logging.getLogger(__name__)
 PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY')
 SERVERSCKEY = os.environ.get('SERVERSCKEY')
 COOLSCKEY = os.environ.get('COOLSCKEY')
-
-# 请求配置
-TIMEOUT = aiohttp.ClientTimeout(total=15)
-MAX_CONCURRENT = 3  # 最大并发数
 
 # ==================== 样式定义（内联样式，兼容PushPlus）====================
 
@@ -134,43 +130,41 @@ line-height: 1.6;
 
 # ==================== 数据获取 ====================
 
-async def fetch_weather(session: aiohttp.ClientSession, city_code: str) -> Optional[Dict]:
-    """异步获取单个城市天气"""
+def fetch_weather(city_code: str) -> Optional[Dict]:
+    """获取单个城市天气（同步）"""
     try:
         url = f'http://t.weather.itboy.net/api/weather/city/{city_code}'
-        async with session.get(url, timeout=TIMEOUT) as response:
-            if response.status == 200:
-                data = await response.json()
-                if data.get('status') == 200:
-                    logger.info(f"获取成功: {city_code}")
-                    return data
-                else:
-                    logger.warning(f"API返回错误: {city_code}, status={data.get('status')}")
-                    return None
+        response = requests.get(url, timeout=15)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('status') == 200:
+                logger.info(f"获取成功: {city_code}")
+                return data
             else:
-                logger.warning(f"请求失败 [{response.status}]: {city_code}")
+                logger.warning(f"API返回错误: {city_code}, status={data.get('status')}")
                 return None
-    except asyncio.TimeoutError:
-        logger.warning(f"请求超时: {city_code}")
-        return None
+        else:
+            logger.warning(f"请求失败 [{response.status_code}]: {city_code}")
+            return None
     except Exception as e:
         logger.error(f"获取天气异常: {city_code}, 错误: {e}")
         return None
 
 
-async def fetch_iciba() -> Optional[Dict]:
+def fetch_iciba() -> Optional[Dict]:
     """获取每日英语"""
     try:
         url = 'http://open.iciba.com/dsapi/'
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=TIMEOUT) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    logger.info("获取每日英语成功")
-                    return data
-                else:
-                    logger.warning(f"获取每日英语失败 [{response.status}]")
-                    return None
+        response = requests.get(url, timeout=15)
+
+        if response.status_code == 200:
+            data = response.json()
+            logger.info("获取每日英语成功")
+            return data
+        else:
+            logger.warning(f"获取每日英语失败 [{response.status_code}]")
+            return None
     except Exception as e:
         logger.error(f"获取每日英语异常: {e}")
         return None
@@ -226,7 +220,7 @@ def weather_to_html(data: Dict) -> str:
             <div style="{STYLE_VALUE}">{weather_data["shidu"]}</div>
         </div>
         <div style="{STYLE_INFO_ITEM}">
-            <div style="{STYLE_LABEL}">😷 感冒指数</div>
+            <div style="{STYLE_LABEL}">🤧 感冒指数</div>
             <div style="{STYLE_VALUE}">{weather_data["ganmao"]}</div>
         </div>
     </div>
@@ -268,7 +262,7 @@ def iciba_to_html(data: Dict) -> str:
 # ==================== 推送功能 ====================
 
 def push_plus(title: str, content: str) -> bool:
-    """PushPlus推送（优化版）"""
+    """PushPlus推送"""
     try:
         if not PUSHPLUSSCKEY:
             logger.error("未设置 PUSHPLUSSCKEY")
@@ -332,7 +326,7 @@ def server_push(title: str, content: str) -> bool:
 
 # ==================== 主程序 ====================
 
-async def main():
+def main():
     """主函数"""
     start_time = time.time()
 
@@ -346,29 +340,25 @@ async def main():
 
     logger.info(f"将获取 {len(city_codes)} 个城市的天气: {city_codes}")
 
-    # 异步并发获取所有城市天气
-    async with aiohttp.ClientSession() as session:
-        # 并发获取天气
-        weather_tasks = [fetch_weather(session, code) for code in city_codes]
-        weather_results = await asyncio.gather(*weather_tasks, return_exceptions=True)
+    # 顺序获取所有城市天气（城市少，同步足够）
+    weather_results = []
+    for code in city_codes:
+        result = fetch_weather(code)
+        weather_results.append(result)
 
-        # 获取每日英语
-        iciba_task = fetch_iciba()
-        iciba_result = await iciba_task
+    # 获取每日英语
+    iciba_result = fetch_iciba()
 
     # 构建HTML内容
     weather_htmls = []
     for i, result in enumerate(weather_results):
         if isinstance(result, Dict) and result:
             weather_htmls.append(weather_to_html(result))
-        elif isinstance(result, Exception):
-            logger.error(f"获取城市 {city_codes[i]} 天气异常: {result}")
-            weather_htmls.append(f'<div style="{STYLE_CITY_CARD}">⚠️ {city_codes[i]} 天气获取失败</div>')
         else:
-            weather_htmls.append(f'<div style="{STYLE_CITY_CARD}">⚠️ {city_codes[i]} 天气数据为空</div>')
+            logger.error(f"获取城市 {city_codes[i]} 天气失败")
+            weather_htmls.append(f'<div style="{STYLE_CITY_CARD}">⚠️ {city_codes[i]} 天气获取失败</div>')
 
     # 组装完整HTML
-    import time
     current_time = time.strftime("%Y-%m-%d %H:%M", time.localtime())
 
     full_html = f'''
@@ -387,8 +377,9 @@ async def main():
 
     success = True
     # PushPlus推送
-    if not push_plus(title, full_html):
-        success = False
+    if PUSHPLUSSCKEY:
+        if not push_plus(title, full_html):
+            success = False
 
     # Server酱推送（如果配置了）
     if SERVERSCKEY:
@@ -406,12 +397,10 @@ async def main():
 
 
 if __name__ == '__main__':
-    import time
-
     # 腾讯云SCF入口
     def main_handler(event, context):
-        asyncio.run(main())
+        main()
         return '执行完成'
 
     # 本地/服务器/GitHub Actions入口
-    asyncio.run(main())
+    main()
