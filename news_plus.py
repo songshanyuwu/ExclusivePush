@@ -386,55 +386,68 @@ def PushPlus(newstitle: str, newscontext: str) -> bool:
         return False
 
 
-def split_and_push(newstitle: str, news_list: NewsList, max_length: int = 8800) -> bool:
-    """分批推送超长内容 - 按新闻项完整分割，每批都有美化效果（使用内联样式）"""
+def split_and_push(newstitle: str, news_list: NewsList, max_html_length: int = 8000) -> bool:
+    """分批推送超长内容 - 按新闻项完整分割，每批都有美化效果（使用内联样式）
+    
+    Args:
+        newstitle: 推送标题
+        news_list: 新闻列表
+        max_html_length: 每批HTML最大字符数（默认8000，PushPlus限制约8800，留800余量）
+    """
     if not news_list.items:
         logger.warning("没有新闻内容需要推送")
         return False
 
-    # 计算总文本长度
-    total_html = news_list.to_html()
-    text_only = re.sub(r'<[^>]+>', '', total_html)
-
-    # 如果总长度在限制内，直接推送完整版
-    if len(text_only) < max_length:
-        return PushPlus(newstitle, total_html)
-
-    # 需要分批推送 - 按新闻项完整分割
-    logger.info(f"内容较长（{len(text_only)}字符），开始按新闻项分批推送...")
-
-    # 收集每条新闻的 HTML 和长度
-    news_htmls = []
-    for item in news_list.items:
-        news_htmls.append({
-            'html': item.to_html(),
-            'length': len(re.sub(r'<[^>]+>', '', item.to_html()))
+    # 先计算单条新闻的HTML长度，用于分批
+    news_infos = []
+    for i, item in enumerate(news_list.items):
+        html = item.to_html()
+        html_len = len(html)
+        news_infos.append({
+            'html': html,
+            'html_len': html_len,
         })
+        logger.debug(f"新闻[{i+1}] HTML长度: {html_len} 字符")
+
+    # 估算每批的包装HTML开销（目录/标题等）
+    # 第一批包含目录，开销约2000字符；后续批次开销约500字符
+    batch_overhead_first = 2000
+    batch_overhead_continue = 500
 
     # 将新闻分配到各批次（确保每条新闻完整不拆分）
     batches = []  # 每个元素是一个列表，包含该批次的新闻索引
     current_batch = []
-    current_length = 0
+    current_html_len = 0
+    current_overhead = batch_overhead_first  # 第一批包含目录
 
-    for i, news in enumerate(news_htmls):
+    for i, info in enumerate(news_infos):
         # 检查如果加上这条新闻会不会超限
-        # 留一些余量给样式和包装
-        needed_length = current_length + news['length'] + 500
+        needed_len = current_html_len + info['html_len'] + current_overhead
 
-        if needed_length > max_length and current_batch:
+        if needed_len > max_html_length and current_batch:
             # 保存当前批次，开始新批次
             batches.append(current_batch)
             current_batch = [i]
-            current_length = news['length']
+            current_html_len = info['html_len']
+            current_overhead = batch_overhead_continue  # 后续批次不包含完整目录
         else:
+            # 检查单条新闻是否超长
+            if info['html_len'] > max_html_length:
+                logger.warning(f"新闻[{i+1}] HTML长度({info['html_len']}字符)超出单批限制({max_html_length})，推送可能失败")
             current_batch.append(i)
-            current_length += news['length']
+            current_html_len += info['html_len']
 
     # 添加最后一批
     if current_batch:
         batches.append(current_batch)
 
-    logger.info(f"将分为 {len(batches)} 批推送")
+    # 如果只有一批，直接推送完整版
+    if len(batches) == 1:
+        total_html = news_list.to_html()
+        logger.info(f"内容共 {len(total_html)} 字符，单次推送")
+        return PushPlus(newstitle, total_html)
+
+    logger.info(f"内容较长，将分为 {len(batches)} 批推送")
 
     # 后续批次的标题样式
     STYLE_TOC_CONTINUE = '''
@@ -482,6 +495,9 @@ font-weight: bold;
 </div>
             '''.strip()
 
+        # 输出本批HTML长度，便于诊断
+        logger.info(f"第 {batch_idx + 1} 批 HTML 长度: {len(batch_html)} 字符")
+        
         if not PushPlus(batch_title, batch_html):
             success = False
             logger.error(f"第 {batch_idx + 1} 批推送失败")
