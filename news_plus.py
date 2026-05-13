@@ -141,7 +141,7 @@ class NewsItem:
         return f'''
 <div style="{STYLE_NEWS_ITEM}">
     <div style="{STYLE_NEWS_TITLE}">
-        <span style="{STYLE_NEWS_INDEX}">{self.index}📰</span>
+        <span style="{STYLE_NEWS_INDEX}">{self.index}</span>
         <b>{escape(self.title)}</b>
         <a href="{escape(self.video_url)}" style="{STYLE_VIDEO_LINK}" target="_blank">🎬 视频</a>
     </div>
@@ -182,7 +182,7 @@ class NewsList:
         """生成目录HTML"""
         toc_items = []
         for item in self.items:
-            toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}📰 {escape(item.title)}</div>')
+            toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index} {escape(item.title)}</div>')
         return '\n'.join(toc_items)
 
     def _generate_content(self) -> str:
@@ -517,7 +517,7 @@ def _generate_toc_for_batch(items: List[NewsItem]) -> str:
     """为一批新闻生成目录HTML"""
     toc_items = []
     for item in items:
-        toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index}📰 {escape(item.title)}</div>')
+        toc_items.append(f'<div style="{STYLE_TOC_ITEM}">{item.index} {escape(item.title)}</div>')
     return '\n'.join(toc_items)
 
 
@@ -550,7 +550,7 @@ async def main():
         return
 
     # 推送（使用按新闻项分割的方式，每批都有美化效果）
-    newstitle = f"{date_str} 新闻联播文字稿"
+    newstitle = f"{date_str} 新闻联播"
     success = split_and_push(newstitle, news_list)
 
     # 统计
