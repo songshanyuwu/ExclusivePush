@@ -1,148 +1,500 @@
 # -*- coding: utf-8 -*-
-import re
-import requests
-from lxml import etree
+"""
+新闻联播文字稿抓取与推送 - 优化版
+功能：异步并发抓取、自动目录、视频链接、美化显示、完整错误处理
+"""
+
+import asyncio
+import aiohttp
+import logging
+import os
 import time
 import json
-import os
+import re
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict
+from html import escape
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+# ==================== 配置 ====================
+
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY')
+
+# 请求配置
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://tv.cctv.com/lm/xwlb/",
+    "Accept": "text/html, */*; q=0.01"
+}
+
+TIMEOUT = aiohttp.ClientTimeout(total=30)  # 总超时30秒
+MAX_CONCURRENT = 5  # 最大并发数
+RETRY_TIMES = 3  # 重试次数
+
+# ==================== 数据结构 ====================
+
+@dataclass
+class NewsItem:
+    """单条新闻数据结构"""
+    title: str
+    content: str
+    video_url: str
+    index: int = 0  # 目录索引
+
+    def to_html(self) -> str:
+        """转换为HTML格式"""
+        return f"""
+<div class="news-item">
+    <div class="news-title">
+        <span class="news-index">{self.index}️⃣</span>
+        <b>{escape(self.title)}</b>
+        <a href="{escape(self.video_url)}" class="video-link" target="_blank">🎬 视频</a>
+    </div>
+    <div class="news-content">{self.content}</div>
+</div>
+        """.strip()
 
 
-###############################################
-# 云函数内置的库中 没有需要的 lxml库 需要自行安装
-# A. 终端-新终端
-# B. 代码下面会有个框-(终端)-输入命令(切换到文件的目录)
-#     cd src
-#     pip3 install  lxml yagmail -t .
-###############################################
+@dataclass
+class NewsList:
+    """新闻列表，管理多条新闻"""
+    items: List[NewsItem] = field(default_factory=list)
+    date: str = ""
 
-PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY') ##PUSHPLUS推送KEY
+    def to_html(self) -> str:
+        """生成完整HTML，包含目录和正文"""
+        if not self.items:
+            return "<p>暂无新闻内容</p>"
 
-# 设置请求头
-headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.57",
-        "Referer": "https://tv.cctv.com/lm/xwlb/",
-        "Accept": "text/html, */*; q=0.01"
-    }
+        # 生成目录
+        toc = self._generate_toc()
+        # 生成正文
+        content = self._generate_content()
 
-# 获取日期
-timeStruct = time.localtime()
-strTime = time.strftime("%Y%m%d", timeStruct)
-# print(strTime)
-# 如果是上午8点以后推送的，括号外的“-1”要删除
-str_time = int(strTime)-1   
-# str_time = int(strTime)
+        return f"""
+<style>
+    .news-container {{
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.8;
+        color: #333;
+        max-width: 100%;
+        word-wrap: break-word;
+    }}
+    .toc {{
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }}
+    .toc-title {{
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }}
+    .toc-list {{
+        columns: 2;
+        column-gap: 20px;
+    }}
+    .toc-item {{
+        break-inside: avoid;
+        padding: 6px 0;
+        font-size: 14px;
+    }}
+    .toc-item a {{
+        color: white;
+        text-decoration: none;
+        opacity: 0.9;
+    }}
+    .toc-item a:hover {{
+        opacity: 1;
+        text-decoration: underline;
+    }}
+    .news-item {{
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        border-left: 4px solid #667eea;
+    }}
+    .news-title {{
+        font-size: 16px;
+        font-weight: bold;
+        color: #1a1a1a;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        flex-wrap: wrap;
+    }}
+    .news-index {{
+        background: #667eea;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        flex-shrink: 0;
+    }}
+    .video-link {{
+        background: #ff4757;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: normal;
+        text-decoration: none;
+        margin-left: auto;
+        flex-shrink: 0;
+    }}
+    .video-link:hover {{
+        background: #ff6b81;
+    }}
+    .news-content {{
+        color: #555;
+        font-size: 14px;
+        line-height: 2;
+    }}
+    .news-content b {{
+        color: #333;
+    }}
+    @media (max-width: 600px) {{
+        .toc-list {{
+            columns: 1;
+        }}
+    }}
+</style>
+
+<div class="news-container">
+    <div class="toc">
+        <div class="toc-title">📋 今日目录（共{len(self.items)}条）</div>
+        <div class="toc-list">
+            {toc}
+        </div>
+    </div>
+    {content}
+</div>
+        """
+
+    def _generate_toc(self) -> str:
+        """生成目录HTML"""
+        toc_items = []
+        for item in self.items:
+            anchor = f"news-{item.index}"
+            toc_items.append(f'<div class="toc-item"><a href="#{anchor}">{item.index}️⃣ {escape(item.title)}</a></div>')
+        return '\n'.join(toc_items)
+
+    def _generate_content(self) -> str:
+        """生成正文HTML"""
+        return '\n'.join([item.to_html() for item in self.items])
 
 
-# # 获取新闻
-# def hq_news():
-#     news = []
-#     url = f'https://tv.cctv.com/lm/xwlb/day/{str_time}.shtml'
-#     response = requests.get(url, headers=headers)
-#     response.encoding = 'RGB'
-#     resp = response.text
-#     etr = etree.HTML(resp)
-#     # titles = etr.xpath("//div[@class='title']/text()")  #已经过期，网站页面调整，本次更新2022-01-23
-#     titles = etr.xpath("//li/a/@title")
-#     hrefs = etr.xpath("//li/a/@href")
-#     i = 0 
-#     for title, href in zip(titles, hrefs):
-#         news_response = requests.get(href, headers=headers)
-#         news_response.encoding = 'RGB'
-#         news_resp = news_response.text
-#         # news_th = etree.HTML(news_resp).xpath('string(//*[@id="about_txt"]/div[2]/div)')
-#         # news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="about_txt"]/div[2]/div//text()')
-#         news_th_tmp = etree.HTML(news_resp).xpath('//*[@id="content_area"]/p[*]/text()')
-#         news_th = ""
-#         for i,n in enumerate(news_th_tmp):
-#             if i < 1:
-#                 news_th = news_th + n
-#             else:
-#                 news_th = news_th + "<br>" + n
-#         # news.append(f"##{title}\n{news_th}\n##视频地址：{href}\n\n")
-#         # news.append(f"##{title}<br>{news_th}<br>##视频地址：{href}<br><br>")
-#         news.append(f"<b>{title}</b><br>{news_th}<br><b>视频地址</b> <a href='{href}'>{href}</a><br><br>")
-#     return news
+# ==================== 工具函数 ====================
 
-# 获取新闻-20250120
-def hq_news():
-    news = []
-    url = f'https://tv.cctv.com/lm/xwlb/day/{str_time}.shtml'
-    response = requests.get(url, headers=headers)
-    response.encoding = 'RGB'
-    resp = response.text
-    etr = etree.HTML(resp)
-    # titles = etr.xpath("//div[@class='title']/text()")  #已经过期，网站页面调整，本次更新2022-01-23
-    titles = etr.xpath("//li/a/@title")
-    hrefs = etr.xpath("//li/a/@href")
+async def fetch_url(session: aiohttp.ClientSession, url: str, semaphore: asyncio.Semaphore) -> Optional[str]:
+    """异步获取URL内容，带并发控制"""
+    async with semaphore:
+        try:
+            async with session.get(url, headers=HEADERS) as response:
+                if response.status == 200:
+                    # 自动检测编码
+                    content = await response.read()
+                    # 尝试多种编码
+                    for encoding in ['utf-8', 'gbk', 'gb2312', 'gb18030']:
+                        try:
+                            return content.decode(encoding)
+                        except UnicodeDecodeError:
+                            continue
+                    # 最后尝试 ignore
+                    return content.decode('utf-8', errors='ignore')
+                else:
+                    logger.warning(f"请求失败 [{response.status}]: {url}")
+                    return None
+        except asyncio.TimeoutError:
+            logger.warning(f"请求超时: {url}")
+            return None
+        except Exception as e:
+            logger.error(f"请求异常: {url}, 错误: {e}")
+            return None
 
-    i = 0 
-    for title, href in zip(titles, hrefs):
-        news_response = requests.get(href, headers=headers)
-        news_response.encoding = 'RGB'
-        news_resp = news_response.text
-        etr_news = etree.HTML(news_resp)
-        
-        # 提取包含 strong 和 p 元素的 div 元素
-        div_elements = etr_news.xpath('//div[@id="content_area"]/p')
-        result = ""
+
+def parse_list_page(html: str) -> List[Dict[str, str]]:
+    """解析新闻列表页"""
+    from lxml import etree
+    try:
+        etr = etree.HTML(html)
+        titles = etr.xpath("//li/a/@title")
+        hrefs = etr.xpath("//li/a/@href")
+
+        news_list = []
+        for title, href in zip(titles, hrefs):
+            if title and href:
+                # 处理相对链接
+                if href.startswith('/'):
+                    href = 'https://tv.cctv.com' + href
+                news_list.append({'title': title.strip(), 'href': href})
+
+        logger.info(f"解析到 {len(news_list)} 条新闻标题")
+        return news_list
+    except Exception as e:
+        logger.error(f"解析列表页失败: {e}")
+        return []
+
+
+def parse_content_page(html: str) -> str:
+    """解析新闻内容页"""
+    from lxml import etree
+    try:
+        etr = etree.HTML(html)
+        div_elements = etr.xpath('//div[@id="content_area"]/p')
+
+        if not div_elements:
+            logger.warning("未找到 content_area 元素")
+            return "⚠️ 内容获取失败"
+
+        result = []
         for div_element in div_elements:
             strong_elements = div_element.xpath('strong/text()')
             p_elements = div_element.xpath('text()')
-            # 处理 strong 元素
-            if strong_elements and strong_elements[0]!= "央视网消息":
-                result += f"<b>{strong_elements[0]}</b><br>"
-            # 处理 p 元素
-            if p_elements and p_elements[0]!= "（新闻联播）：":
-                # result += f"{p_elements[0]}<br>"
-                # 在 p 元素开头添加两个空格
-                p_text = "&nbsp;&nbsp;" + p_elements[0].strip()  
-                result += f"{p_text}<br>"
-        # news.append(f"<b>{title}</b><br>{result}<br><b>视频地址</b> <a href='{href}'>{href}</a><br>")
-        news.append(f"<b>{title}</b><br>{result}<br><br>")
-    return news
 
-# PushPlus推送
-def PushPlus(newstitle, newscontext):
-    PushPlus = 'http://www.pushplus.plus/send'
-    data = {
-        "token":PUSHPLUSSCKEY,
-        "title":newstitle,
-        "content":newscontext,
-        "template":"html"
-    }
-    body=json.dumps(data).encode(encoding='utf-8')
-    requests.post(url=PushPlus,data=body,headers=headers)
-    return 'PushPlus推送成功'
+            # 处理 strong 元素（加粗标题）
+            if strong_elements and strong_elements[0] and strong_elements[0] != "央视网消息":
+                result.append(f"<b>{escape(strong_elements[0])}</b>")
+
+            # 处理 p 元素（正文内容）
+            if p_elements and p_elements[0] and p_elements[0] != "（新闻联播）：":
+                # 在开头添加两个空格
+                p_text = "&nbsp;&nbsp;" + escape(p_elements[0].strip())
+                result.append(p_text)
+
+        return '<br>'.join(result) if result else "⚠️ 内容获取失败"
+
+    except Exception as e:
+        logger.error(f"解析内容页失败: {e}")
+        return "⚠️ 内容获取失败"
 
 
-# 在腾讯云SCF用这个，这个函数名和执行方法有关系
-# (event, context)就这样写，也没有搞明白为什么这样写，可能云函数就是这样定义程序执行入口的
-# 难受的是这个一直没有从帮助文档上找到，可能人家以为这个忒简单了，┭┮﹏┭┮
-# def main_handler(event, context):
+# ==================== 核心功能 ====================
 
-# 在服务器上用这个
-if __name__ == '__main__':
-    newstitle = str(str_time) + "新闻联播文字稿"
-    news = hq_news()
-    # print(news)
-    # newscontext = "".join(news)
-    # 推送限制字符应该在10000一下，多了就丢弃不响应了；所以这里需要拆分一下，分成多个推送消息
-    # 这里也是个坑，推送上没有说明，但是测试结果可以证实这一点
-    newscontext = ""
-    newscontext_tmp = ""
-    for i in news:
-        if len(newscontext) < 8888:
-            newscontext_tmp = newscontext + i
-            if len(newscontext_tmp) >= 8888:
-                #p rint(newscontext)
-                print("发送一次推送")
-                PushPlus(newstitle, newscontext)
-                newscontext = ""
-                newscontext_tmp = ""
+async def fetch_single_news(session: aiohttp.ClientSession, semaphore: asyncio.Semaphore,
+                             title: str, href: str, index: int) -> Optional[NewsItem]:
+    """获取单条新闻内容"""
+    logger.info(f"正在获取 [{index}] {title[:20]}...")
+
+    # 重试获取内容页
+    for attempt in range(RETRY_TIMES):
+        html = await fetch_url(session, href, semaphore)
+        if html:
+            content = parse_content_page(html)
+            return NewsItem(
+                title=title,
+                content=content,
+                video_url=href,
+                index=index
+            )
+
+        if attempt < RETRY_TIMES - 1:
+            wait_time = (attempt + 1) * 2  # 指数退避
+            logger.warning(f"获取失败，{wait_time}秒后重试...")
+            await asyncio.sleep(wait_time)
+
+    logger.error(f"获取失败 [{index}] {title[:20]}")
+    # 返回带错误提示的新闻
+    return NewsItem(
+        title=title,
+        content="⚠️ 内容获取失败，请查看视频",
+        video_url=href,
+        index=index
+    )
+
+
+async def hq_news_async(date_str: str) -> NewsList:
+    """异步并发获取新闻联播"""
+    logger.info(f"开始获取 {date_str} 日新闻联播...")
+
+    # 获取列表页
+    list_url = f'https://tv.cctv.com/lm/xwlb/day/{date_str}.shtml'
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+        list_html = await fetch_url(session, list_url, asyncio.Semaphore(1))
+
+        if not list_html:
+            logger.error("获取列表页失败")
+            return NewsList(date=date_str)
+
+        # 解析新闻列表
+        news_list = parse_list_page(list_html)
+
+        if not news_list:
+            logger.warning("未解析到任何新闻")
+            return NewsList(date=date_str)
+
+        # 并发获取所有新闻内容
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+        tasks = [
+            fetch_single_news(session, semaphore, item['title'], item['href'], i + 1)
+            for i, item in enumerate(news_list)
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 整理结果
+        news_items = []
+        for result in results:
+            if isinstance(result, NewsItem):
+                news_items.append(result)
+            elif isinstance(result, Exception):
+                logger.error(f"获取异常: {result}")
+
+        logger.info(f"成功获取 {len(news_items)}/{len(news_list)} 条新闻")
+
+        return NewsList(items=news_items, date=date_str)
+
+
+def PushPlus(newstitle: str, newscontext: str) -> bool:
+    """PushPlus推送"""
+    try:
+        PushPlus_url = 'http://www.pushplus.plus/send'
+        data = {
+            "token": PUSHPLUSSCKEY,
+            "title": newstitle,
+            "content": newscontext,
+            "template": "html"
+        }
+        body = json.dumps(data).encode(encoding='utf-8')
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        import requests
+        response = requests.post(url=PushPlus_url, data=body, headers=headers, timeout=10)
+
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('code') == 200:
+                logger.info("PushPlus推送成功")
+                return True
             else:
-                newscontext = newscontext_tmp
-    if len(newscontext) != 0:
-        # print(newscontext)
-        print("发送最后一次推送")
-        PushPlus(newstitle, newscontext)
-        
+                logger.error(f"PushPlus推送失败: {result.get('msg')}")
+                return False
+        else:
+            logger.error(f"PushPlus请求失败 [{response.status_code}]")
+            return False
+
+    except Exception as e:
+        logger.error(f"PushPlus推送异常: {e}")
+        return False
+
+
+def split_and_push(newstitle: str, html_content: str, max_length: int = 8800) -> bool:
+    """分批推送超长内容"""
+    # 计算实际内容长度（去掉HTML标签后）
+    text_only = re.sub(r'<[^>]+>', '', html_content)
+
+    if len(text_only) < max_length:
+        return PushPlus(newstitle, html_content)
+
+    # 需要分批推送
+    logger.info(f"内容较长（{len(text_only)}字符），开始分批推送...")
+
+    # 分割新闻项
+    news_blocks = re.split(r'(<div class="news-item">)', html_content)
+    batches = []
+    current_batch = ""
+    current_length = 0
+
+    for i, block in enumerate(news_blocks):
+        if not block.strip():
+            continue
+
+        block_length = len(re.sub(r'<[^>]+>', '', block))
+
+        if current_length + block_length > max_length and current_batch:
+            batches.append(current_batch)
+            current_batch = ""
+            current_length = 0
+
+        current_batch += block
+        current_length += block_length
+
+    if current_batch:
+        batches.append(current_batch)
+
+    # 推送所有批次
+    success = True
+    for i, batch in enumerate(batches):
+        batch_title = f"{newstitle} ({i+1}/{len(batches)})"
+        logger.info(f"推送第 {i+1}/{len(batches)} 批...")
+        if not PushPlus(batch_title, batch):
+            success = False
+
+    return success
+
+
+# ==================== 主程序 ====================
+
+async def main():
+    """主函数"""
+    start_time = time.time()
+
+    # 获取日期（昨天）
+    timeStruct = time.localtime()
+    strTime = time.strftime("%Y%m%d", timeStruct)
+    date_str = str(int(strTime) - 1)  # 昨天的日期
+
+    logger.info("=" * 50)
+    logger.info("新闻联播文字稿抓取程序启动")
+    logger.info(f"日期: {date_str}")
+    logger.info("=" * 50)
+
+    # 检查Token
+    if not PUSHPLUSSCKEY:
+        logger.error("未设置 PUSHPLUSSCKEY 环境变量")
+        return
+
+    # 异步获取新闻
+    news_list = await hq_news_async(date_str)
+
+    if not news_list.items:
+        logger.warning("没有获取到任何新闻内容")
+        return
+
+    # 生成HTML
+    html_content = news_list.to_html()
+
+    # 推送
+    newstitle = f"{date_str} 新闻联播文字稿 📺"
+    success = split_and_push(newstitle, html_content)
+
+    # 统计
+    elapsed = time.time() - start_time
+    logger.info("=" * 50)
+    logger.info(f"执行完成，耗时: {elapsed:.2f}秒")
+    logger.info(f"新闻条数: {len(news_list.items)}")
+    logger.info(f"推送结果: {'成功' if success else '失败'}")
+    logger.info("=" * 50)
+
+
+# ==================== 入口 ====================
+
+if __name__ == '__main__':
+    # 腾讯云SCF入口
+    def main_handler(event, context):
+        asyncio.run(main())
+        return '执行完成'
+
+    # 本地/服务器入口
+    asyncio.run(main())
