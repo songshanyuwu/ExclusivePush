@@ -75,28 +75,28 @@ margin: 6px 0;
 STYLE_INFO_GRID = '''
 display: grid;
 grid-template-columns: 1fr 1fr;
-gap: 6px;
+gap: 5px;
 margin-top: 6px;
 '''.strip()
 
 STYLE_INFO_ITEM = '''
 background: #f8f9fa;
-padding: 6px 8px;
-border-radius: 5px;
-font-size: 11px;
+padding: 4px 6px;
+border-radius: 4px;
+font-size: 10px;
 color: #555;
 '''.strip()
 
 STYLE_LABEL = '''
 color: #999;
-font-size: 10px;
-margin-bottom: 2px;
+font-size: 9px;
+margin-bottom: 1px;
 '''.strip()
 
 STYLE_VALUE = '''
 color: #333;
 font-weight: 500;
-font-size: 11px;
+font-size: 10px;
 '''.strip()
 
 STYLE_NOTICE = '''
@@ -110,11 +110,10 @@ line-height: 1.3;
 '''.strip()
 
 STYLE_FORECAST = '''
-margin-top: 8px;
-font-size: 11px;
-color: #888;
-text-align: right;
-line-height: 1.6;
+margin-top: 6px;
+font-size: 10px;
+color: #999;
+line-height: 1.5;
 '''.strip()
 
 STYLE_ENGLISH = '''
@@ -196,8 +195,10 @@ def weather_to_html(data: Dict) -> str:
         }
         weather_icon = weather_icons.get(today["type"], '🌤️')
 
-        # 紧凑的三日预报
-        forecast_text = f'''昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]} &nbsp;|&nbsp; 今日: {today["high"]} / {today["low"]} {today["type"]} &nbsp;|&nbsp; 明日: {tomorrow["high"]} / {tomorrow["low"]} {tomorrow["type"]}'''
+        # 三日预报 - 三行独立显示
+        forecast_text = f'''昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]}
+今日: {today["high"]} / {today["low"]} {today["type"]}
+明日: {tomorrow["high"]} / {tomorrow["low"]} {tomorrow["type"]}'''
 
         html = f'''
 <div style="{STYLE_CITY_CARD}">
