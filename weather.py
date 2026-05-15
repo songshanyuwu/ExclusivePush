@@ -105,7 +105,7 @@ padding: 8px 10px;
 border-radius: 6px;
 margin-top: 8px;
 color: #8b4513;
-font-size: 12px;
+font-size: 10px;
 line-height: 1.3;
 '''.strip()
 
@@ -208,15 +208,15 @@ def weather_to_html(data: Dict) -> str:
     <div style="{STYLE_INFO_GRID}">
         <div style="{STYLE_INFO_ITEM}">
             <div style="{STYLE_LABEL}">💨 风力</div>
-            <div style="{STYLE_VALUE}">{today["fx"]} {today["fl"]}</div>
+            <div style="{STYLE_VALUE}; font-size: 13px;">{today["fx"]} {today["fl"]}</div>
         </div>
         <div style="{STYLE_INFO_ITEM}">
             <div style="{STYLE_LABEL}">🌫️ 空气</div>
-            <div style="{STYLE_VALUE}">{weather_data["quality"]}</div>
+            <div style="{STYLE_VALUE}; font-size: 13px;">{weather_data["quality"]}</div>
         </div>
         <div style="{STYLE_INFO_ITEM}">
             <div style="{STYLE_LABEL}">💧 湿度</div>
-            <div style="{STYLE_VALUE}">{weather_data["shidu"]}</div>
+            <div style="{STYLE_VALUE}; font-size: 13px;">{weather_data["shidu"]}</div>
         </div>
     </div>
 
@@ -229,9 +229,9 @@ def weather_to_html(data: Dict) -> str:
     </div>
 
     <div style="margin-top: 8px; font-size: 11px; color: #999; text-align: center; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;">
-        <span>昨日: {yesterday["type"]} {yesterday["high"]} / {yesterday["low"]}</span>
-        <span>今日: {today["type"]} {today["high"]} / {today["low"]}</span>
-        <span>明日: {tomorrow["type"]} {tomorrow["high"]} / {tomorrow["low"]}</span>
+        <span>昨日: {yesterday["type"]} {yesterday["high"][3:]} / {yesterday["low"][3:]}</span>
+        <span>今日: {today["type"]} {today["high"][3:]} / {today["low"][3:]}</span>
+        <span>明日: {tomorrow["type"]} {tomorrow["high"][3:]} / {tomorrow["low"][3:]}</span>
     </div>
 </div>
         '''.strip()
