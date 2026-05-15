@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-天气推送脚本 - 优化版
+天气推送脚本 - 紧凑版
 功能：获取多城市天气、精美HTML展示、完整错误处理、兼容PushPlus
-注意：使用同步请求（城市数量少，无需异步）
+优化：紧凑排版设计
 """
 
 import logging
@@ -26,23 +26,23 @@ PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY')
 SERVERSCKEY = os.environ.get('SERVERSCKEY')
 COOLSCKEY = os.environ.get('COOLSCKEY')
 
-# ==================== 样式定义（内联样式，兼容PushPlus）====================
+# ==================== 样式定义（内联样式，兼容PushPlus）- 紧凑版 ====================
 
 STYLE_CONTAINER = '''
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-padding: 20px;
-border-radius: 16px;
+padding: 12px 14px;
+border-radius: 10px;
 color: white;
-margin-bottom: 20px;
+margin-bottom: 10px;
 '''.strip()
 
 STYLE_CITY_CARD = '''
 background: white;
-border-radius: 12px;
-padding: 20px;
-margin-bottom: 16px;
-box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+border-radius: 8px;
+padding: 12px 14px;
+margin-bottom: 8px;
+box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 color: #333;
 '''.strip()
 
@@ -50,82 +50,92 @@ STYLE_CITY_HEADER = '''
 display: flex;
 align-items: center;
 justify-content: space-between;
-margin-bottom: 16px;
-padding-bottom: 12px;
-border-bottom: 2px solid #f0f0f0;
+margin-bottom: 8px;
+padding-bottom: 6px;
+border-bottom: 1px solid #f0f0f0;
 '''.strip()
 
 STYLE_CITY_NAME = '''
-font-size: 18px;
+font-size: 15px;
 font-weight: bold;
 color: #667eea;
 '''.strip()
 
 STYLE_WEATHER_ICON = '''
-font-size: 32px;
+font-size: 24px;
 '''.strip()
 
 STYLE_TEMP = '''
-font-size: 28px;
+font-size: 20px;
 font-weight: bold;
 color: #ff6b6b;
-margin: 12px 0;
+margin: 6px 0;
 '''.strip()
 
 STYLE_INFO_GRID = '''
 display: grid;
 grid-template-columns: 1fr 1fr;
-gap: 10px;
-margin-top: 12px;
+gap: 6px;
+margin-top: 6px;
 '''.strip()
 
 STYLE_INFO_ITEM = '''
 background: #f8f9fa;
-padding: 10px 12px;
-border-radius: 8px;
-font-size: 13px;
+padding: 6px 8px;
+border-radius: 5px;
+font-size: 11px;
 color: #555;
 '''.strip()
 
 STYLE_LABEL = '''
 color: #999;
-font-size: 12px;
-margin-bottom: 4px;
+font-size: 10px;
+margin-bottom: 2px;
 '''.strip()
 
 STYLE_VALUE = '''
 color: #333;
 font-weight: 500;
+font-size: 11px;
 '''.strip()
 
 STYLE_NOTICE = '''
 background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-padding: 12px 16px;
-border-radius: 10px;
-margin-top: 16px;
+padding: 8px 10px;
+border-radius: 6px;
+margin-top: 8px;
 color: #8b4513;
-font-size: 14px;
+font-size: 12px;
+line-height: 1.3;
+'''.strip()
+
+STYLE_FORECAST = '''
+margin-top: 8px;
+font-size: 11px;
+color: #888;
+text-align: right;
+line-height: 1.6;
 '''.strip()
 
 STYLE_ENGLISH = '''
 background: #f0f4ff;
-padding: 16px;
-border-radius: 10px;
-margin-top: 20px;
-border-left: 4px solid #667eea;
+padding: 10px;
+border-radius: 6px;
+margin-top: 10px;
+border-left: 3px solid #667eea;
 '''.strip()
 
 STYLE_ENGLISH_TITLE = '''
-font-size: 14px;
+font-size: 12px;
 font-weight: bold;
 color: #667eea;
-margin-bottom: 8px;
+margin-bottom: 4px;
 '''.strip()
 
 STYLE_ENGLISH_CONTENT = '''
 color: #555;
-font-size: 14px;
-line-height: 1.6;
+font-size: 12px;
+line-height: 1.4;
 '''.strip()
 
 # ==================== 数据获取 ====================
@@ -171,7 +181,7 @@ def fetch_iciba() -> Optional[Dict]:
 
 
 def weather_to_html(data: Dict) -> str:
-    """将天气数据转换为美化HTML"""
+    """将天气数据转换为美化HTML（紧凑版）"""
     try:
         city_info = data["cityInfo"]
         weather_data = data["data"]
@@ -181,37 +191,31 @@ def weather_to_html(data: Dict) -> str:
 
         # 天气图标映射
         weather_icons = {
-            '晴': '☀️',
-            '多云': '⛅',
-            '阴': '☁️',
-            '小雨': '🌧️',
-            '中雨': '🌧️',
-            '大雨': '🌧️',
-            '暴雨': '⛈️',
-            '雷阵雨': '⛈️',
-            '雪': '❄️',
-            '雾': '🌫️',
-            '霾': '🌫️'
+            '晴': '☀️', '多云': '⛅', '阴': '☁️', '小雨': '🌧️', '中雨': '🌧️',
+            '大雨': '🌧️', '暴雨': '⛈️', '雷阵雨': '⛈️', '雪': '❄️', '雾': '🌫️', '霾': '🌫️'
         }
         weather_icon = weather_icons.get(today["type"], '🌤️')
+
+        # 紧凑的三日预报
+        forecast_text = f'''昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]} &nbsp;|&nbsp; 今日: {today["high"]} / {today["low"]} {today["type"]} &nbsp;|&nbsp; 明日: {tomorrow["high"]} / {tomorrow["low"]} {tomorrow["type"]}'''
 
         html = f'''
 <div style="{STYLE_CITY_CARD}">
     <div style="{STYLE_CITY_HEADER}">
         <div style="{STYLE_CITY_NAME}">📍 {city_info["parent"]} {city_info["city"]}</div>
-        <div style="color: #ff6b6b; font-size: 16px; font-weight: bold; margin-bottom: 12px;">{today["type"]}</div>
+        <div style="color: #ff6b6b; font-size: 13px; font-weight: bold;">{today["type"]}</div>
         <div style="{STYLE_WEATHER_ICON}">{weather_icon}</div>
     </div>
-    
+
     <div style="{STYLE_TEMP}">{today["high"]} / {today["low"]}</div>
-    
+
     <div style="{STYLE_INFO_GRID}">
         <div style="{STYLE_INFO_ITEM}">
-            <div style="{STYLE_LABEL}">💨 风力风向</div>
+            <div style="{STYLE_LABEL}">💨 风力</div>
             <div style="{STYLE_VALUE}">{today["fx"]} {today["fl"]}</div>
         </div>
         <div style="{STYLE_INFO_ITEM}">
-            <div style="{STYLE_LABEL}">🌫️ 空气质量</div>
+            <div style="{STYLE_LABEL}">🌫️ 空气</div>
             <div style="{STYLE_VALUE}">{weather_data["quality"]}</div>
         </div>
         <div style="{STYLE_INFO_ITEM}">
@@ -219,24 +223,14 @@ def weather_to_html(data: Dict) -> str:
             <div style="{STYLE_VALUE}">{weather_data["shidu"]}</div>
         </div>
         <div style="{STYLE_INFO_ITEM}">
-            <div style="{STYLE_LABEL}">🤧 感冒指数</div>
-            <div style="{STYLE_VALUE}">{weather_data["ganmao"]}</div>
+            <div style="{STYLE_LABEL}">🤧 感冒</div>
+            <div style="{STYLE_VALUE}">{weather_data["ganmao"][:15]}...</div>
         </div>
     </div>
-    
-    <div style="{STYLE_NOTICE}">
-        💡 {today["notice"]}
-    </div>
-    
-    <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
-        昨日: {yesterday["high"]} / {yesterday["low"]} {yesterday["type"]}
-    </div>
-    <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
-        今日: {today["high"]} / {today["low"]} {today["type"]}
-    </div>
-    <div style="margin-top: 12px; font-size: 12px; color: #999; text-align: right;">
-        明日: {tomorrow["high"]} / {tomorrow["low"]} {tomorrow["type"]}
-    </div>
+
+    <div style="{STYLE_NOTICE}">💡 {today["notice"]}</div>
+
+    <div style="{STYLE_FORECAST}">{forecast_text}</div>
 </div>
         '''.strip()
 
@@ -248,7 +242,7 @@ def weather_to_html(data: Dict) -> str:
 
 
 def iciba_to_html(data: Dict) -> str:
-    """将每日英语转换为美化HTML"""
+    """将每日英语转换为美化HTML（紧凑版）"""
     if not data:
         return ""
 
@@ -256,8 +250,8 @@ def iciba_to_html(data: Dict) -> str:
 <div style="{STYLE_ENGLISH}">
     <div style="{STYLE_ENGLISH_TITLE}">📖 每日一句</div>
     <div style="{STYLE_ENGLISH_CONTENT}">
-        <div style="margin-bottom: 8px;"><b>{data.get("content", "")}</b></div>
-        <div style="color: #888; font-size: 13px;">{data.get("note", "")}</div>
+        <div style="margin-bottom: 4px;"><b>{data.get("content", "")}</b></div>
+        <div style="color: #888; font-size: 11px;">{data.get("note", "")}</div>
     </div>
 </div>
     '''.strip()
@@ -335,7 +329,7 @@ def main():
     start_time = time.time()
 
     logger.info("=" * 50)
-    logger.info("天气推送脚本启动")
+    logger.info("天气推送脚本启动（紧凑版）")
     logger.info("=" * 50)
 
     # 城市列表（可以从环境变量读取，方便配置）
@@ -367,8 +361,8 @@ def main():
 
     full_html = f'''
 <div style="{STYLE_CONTAINER}">
-    <div style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">🌤️ 今日天气播报</div>
-    <div style="font-size: 14px; opacity: 0.9;">{current_time}</div>
+    <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px;">🌤️ 今日天气</div>
+    <div style="font-size: 11px; opacity: 0.85;">{current_time}</div>
 </div>
 
 {' '.join(weather_htmls)}
