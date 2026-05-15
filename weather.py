@@ -74,7 +74,7 @@ margin: 6px 0;
 
 STYLE_INFO_GRID = '''
 display: grid;
-grid-template-columns: 1fr 1fr;
+grid-template-columns: 1fr 1fr 1fr;
 gap: 5px;
 margin-top: 6px;
 '''.strip()
