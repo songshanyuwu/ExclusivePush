@@ -398,9 +398,9 @@ def split_and_push(newstitle: str, news_list: NewsList, max_html_length: int = N
         news_list: 新闻列表
         max_html_length: 每批HTML最大字符数（默认从环境变量 PUSHPLUS_MAX_LENGTH 读取，未设置则使用19000）
     """
-    # 从环境变量读取最大长度，未设置则使用默认值19000（PushPlus限制约20000，留1000余量）
+    # 从环境变量读取最大长度，未设置则使用默认值18000（PushPlus限制约20000，留1000余量）
     if max_html_length is None:
-        max_html_length = int(os.environ.get('PUSHPLUS_MAX_LENGTH', '19000'))
+        max_html_length = int(os.environ.get('PUSHPLUS_MAX_LENGTH', '18000'))
     
     logger.info(f"分批推送设置：max_html_length={max_html_length}")
     if not news_list.items:
