@@ -122,7 +122,7 @@ flex-shrink: 0;
 
 STYLE_NEWS_CONTENT = '''
 color: #555;
-font-size: 14px;
+font-size: 16px;
 line-height: 2;
 '''.strip()
 
