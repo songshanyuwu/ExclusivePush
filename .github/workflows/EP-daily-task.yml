@@ -25,13 +25,13 @@ jobs:
 
     # 检出，就是官方社区贡献的用来拉取仓库分支的 Action，你不需要考虑安装 git 命令工具，只需要把分支参数传入即可。
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     # Python 环境
     - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.8
+        python-version: '3.8'
         
     #- name: Install dependencies
     #  run: |
@@ -57,9 +57,10 @@ jobs:
     - name: Install tenacity
       run: pip install tenacity
       
-      # 运行脚本
+    # 运行脚本
     - name: 'Working1'
-      env:	#添加环境变量
+      env:  # 添加环境变量
+        SENIVERSE_API_KEY: ${{ secrets.SENIVERSE_API_KEY }}
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
         SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
@@ -67,14 +68,14 @@ jobs:
       # run: python weather.py
       run: python weather-new.py
       
-      # 运行脚本
+    # 运行脚本
     - name: 'Working2'
-      env:	#添加环境变量
+      env:  # 添加环境变量
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
       run: python news_plus.py
       
-      # 运行脚本
+    # 运行脚本
     #- name: 'Working3'
-    #  env:	#添加环境变量
+    #  env:  # 添加环境变量
     #    PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
     #  run: python epidemicSsituation.py
