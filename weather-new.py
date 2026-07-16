@@ -201,10 +201,12 @@ def _weekday_cn(date_str: str) -> str:
 
 
 def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label: str) -> str:
-    """将单个城市双源数据(itboy + 心知)整合为 6 行紧凑卡片。
+    """将单个城市双源数据(itboy + 心知)整合为紧凑卡片。
 
-    行1 城市名 | 行2 itboy天气+分隔+心知当前 | 行3 itboy近三天
-    行4 心知未来三天(表格对齐，含日期星期) | 行5 心知生活指数 | 行6 itboy风力/空气/湿度+温馨提示
+    布局顺序（按用户指定）：
+      头部(城市名+itboy天气 | 心知当前) → 风力/空气/湿度(内容块·外围带圈)
+      → itboy 近三天 → 心知未来三天(表格对齐·含星期)
+      → 生活指数(内容块·圆形 chip·外围带圈) → 温馨提示
     itboy 温度保留原始 '高温 33℃' / '低温 25℃' 文本，不做裁剪。
     """
     # ---------- itboy 解析 ----------
@@ -235,13 +237,7 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
         t_type = t_high = t_low = y_type = y_high = y_low = ""
         mo_type = mo_high = mo_low = fx = fl = quality = shidu = notice = ""
 
-    # ---------- 行1：城市名称 ----------
-    row1 = (f'<div style="font-size:15px;font-weight:bold;color:#667eea;'
-            f'margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #f0f0f0;">'
-            f'📍 {city_name}</div>')
-
-    # ---------- 行2：itboy天气 + 分隔 + 心知当前 ----------
-    # itboy 温度保持原样 '高温 33℃ / 低温 25℃'
+    # ---------- 头部：城市名 + itboy天气 + 分隔 + 心知当前 ----------
     ib_weather = f'{t_type} {t_high} / {t_low}' if (t_type or t_high) else '无数据'
     sx_now = seniverse.get('now') if isinstance(seniverse, Dict) else None
     if isinstance(sx_now, Dict) and sx_now:
@@ -250,19 +246,39 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
                       if sx_temp is not None else f'🛰️ {sx_now.get("text", "—")}')
     else:
         sx_now_str = '🛰️ 无数据'
-    row2 = (f'<div style="font-size:12px;color:#333;margin-bottom:4px;">'
-            f'{ib_weather} &nbsp;|&nbsp; {sx_now_str}</div>')
+    header = (f'<div style="font-size:15px;font-weight:bold;color:#667eea;'
+              f'margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0f0f0;">'
+              f'📍 {city_name} &nbsp; {ib_weather} &nbsp;|&nbsp; '
+              f'<span style="font-weight:normal;color:#333;">{sx_now_str}</span></div>')
 
-    # ---------- 行3：itboy 近三天 ----------
+    # ---------- 风力/空气/湿度：内容块（外围带圈）----------
     if ib_ok:
-        row3 = (f'<div style="font-size:10px;color:#777;margin-bottom:4px;">'
-                f'昨日 {y_type} {y_high} / {y_low} &nbsp;·&nbsp; '
-                f'今日 {t_type} {t_high} / {t_low} &nbsp;·&nbsp; '
-                f'明日 {mo_type} {mo_high} / {mo_low}</div>')
+        wx_block = (
+            f'<div style="border:1px solid #e3e8f0;border-radius:8px;padding:8px 10px;'
+            f'margin-bottom:6px;display:flex;gap:16px;font-size:10px;color:#555;">'
+            f'<span><span style="color:#999;font-size:9px;display:block;margin-bottom:2px;">💨 风力</span>'
+            f'<span style="font-weight:500;">{fx} {fl}</span></span>'
+            f'<span><span style="color:#999;font-size:9px;display:block;margin-bottom:2px;">🌫️ 空气</span>'
+            f'<span style="font-weight:500;">{quality}</span></span>'
+            f'<span><span style="color:#999;font-size:9px;display:block;margin-bottom:2px;">💧 湿度</span>'
+            f'<span style="font-weight:500;">{shidu}</span></span>'
+            f'</div>'
+        )
     else:
-        row3 = '<div style="font-size:10px;color:#999;margin-bottom:4px;">itboy 天气获取失败</div>'
+        wx_block = ('<div style="border:1px solid #e3e8f0;border-radius:8px;padding:8px 10px;'
+                    'margin-bottom:6px;font-size:10px;color:#999;">'
+                    'itboy 天气获取失败，无法展示风力/空气/湿度</div>')
 
-    # ---------- 行4：心知未来三天（表格对齐，含日期星期）----------
+    # ---------- itboy 近三天 ----------
+    if ib_ok:
+        near3 = (f'<div style="font-size:10px;color:#777;margin-bottom:6px;">'
+                 f'昨日 {y_type} {y_high} / {y_low} &nbsp;·&nbsp; '
+                 f'今日 {t_type} {t_high} / {t_low} &nbsp;·&nbsp; '
+                 f'明日 {mo_type} {mo_high} / {mo_low}</div>')
+    else:
+        near3 = '<div style="font-size:10px;color:#999;margin-bottom:6px;">itboy 天气获取失败</div>'
+
+    # ---------- 心知未来三天（表格对齐，含日期星期）----------
     sx_daily = seniverse.get('daily') if isinstance(seniverse, Dict) else None
     if isinstance(sx_daily, list) and sx_daily:
         cell = 'padding:2px 6px;border-bottom:1px solid #f0f0f0;font-size:10px;'
@@ -286,15 +302,16 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
                 f'<td style="{cell}white-space:nowrap;color:#888;">{detail}</td>'
                 f'</tr>'
             )
-        row4 = (
+        seniverse_future = (
             f'<div style="font-size:10px;color:#999;margin:4px 0 2px;">🛰️ 未来三天</div>'
-            f'<table style="width:100%;border-collapse:collapse;margin-bottom:4px;">'
+            f'<table style="width:100%;border-collapse:collapse;margin-bottom:6px;">'
             f'{"".join(rows)}</table>'
         )
     else:
-        row4 = '<div style="font-size:10px;color:#999;margin-bottom:4px;">🛰️ 未来三天：无数据</div>'
+        seniverse_future = ('<div style="font-size:10px;color:#999;margin-bottom:6px;">'
+                            '🛰️ 未来三天：无数据</div>')
 
-    # ---------- 行5：心知生活指数 ----------
+    # ---------- 生活指数：内容块（圆形 chip · 外围带圈）----------
     sx_sug = seniverse.get('suggestion') if isinstance(seniverse, Dict) else None
     chips = []
     if isinstance(sx_sug, Dict):
@@ -303,31 +320,30 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
             brief = val.get('brief', '') if isinstance(val, Dict) else ''
             if brief:
                 chips.append(f'{name}·{brief}')
-    row5 = ('<div style="font-size:10px;color:#667eea;margin-bottom:4px;">'
-            + ' '.join(chips) + '</div>') if chips else \
-           '<div style="font-size:10px;color:#999;margin-bottom:4px;">🛰️ 生活指数：无数据</div>'
-
-    # ---------- 行6：itboy 风力/空气/湿度 + 温馨提示 ----------
-    if ib_ok:
-        row6 = f'''
-        <div style="display:flex;gap:12px;font-size:10px;color:#555;margin-bottom:6px;">
-            <span><span style="{STYLE_LABEL}">💨 风力</span><br><span style="{STYLE_VALUE}">{fx} {fl}</span></span>
-            <span><span style="{STYLE_LABEL}">🌫️ 空气</span><br><span style="{STYLE_VALUE}">{quality}</span></span>
-            <span><span style="{STYLE_LABEL}">💧 湿度</span><br><span style="{STYLE_VALUE}">{shidu}</span></span>
-        </div>
-        <div style="{STYLE_NOTICE}">💡 {notice}</div>
-        '''
+    if chips:
+        chip_html = ''.join(
+            f'<span style="display:inline-block;border:1px solid #c7d0f5;border-radius:12px;'
+            f'padding:2px 8px;margin:2px;font-size:10px;color:#667eea;background:#f5f7ff;">{c}</span>'
+            for c in chips
+        )
+        sug_block = (f'<div style="border:1px solid #e3e8f0;border-radius:8px;'
+                     f'padding:8px 10px;margin-bottom:6px;">{chip_html}</div>')
     else:
-        row6 = f'<div style="{STYLE_NOTICE}">💡 itboy 天气获取失败，无法展示风力/空气/湿度</div>'
+        sug_block = ('<div style="border:1px solid #e3e8f0;border-radius:8px;'
+                     'padding:8px 10px;margin-bottom:6px;font-size:10px;color:#999;">'
+                     '🛰️ 生活指数：无数据</div>')
+
+    # ---------- 温馨提示 ----------
+    notice_block = f'<div style="{STYLE_NOTICE}">💡 {notice}</div>' if (ib_ok and notice) else ''
 
     return f'''
 <div style="{STYLE_CITY_CARD}">
-    {row1}
-    {row2}
-    {row3}
-    {row4}
-    {row5}
-    {row6}
+    {header}
+    {wx_block}
+    {near3}
+    {seniverse_future}
+    {sug_block}
+    {notice_block}
 </div>
         '''.strip()
 
