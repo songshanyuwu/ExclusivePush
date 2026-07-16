@@ -190,8 +190,8 @@ def fetch_iciba() -> Optional[Dict]:
         return None
 
 
-def weather_to_html(data: Dict, seniverse: Optional[Dict] = None) -> str:
-    """将天气数据转换为美化HTML（紧凑版）。seniverse 为心知补充数据源(可选)。"""
+def weather_to_html(data: Dict) -> str:
+    """将 itboy 天气数据转换为美化HTML（紧凑版）。"""
     try:
         city_info = data["cityInfo"]
         weather_data = data["data"]
@@ -244,7 +244,6 @@ def weather_to_html(data: Dict, seniverse: Optional[Dict] = None) -> str:
         <span>今日: {today["type"]} {today["high"][3:]} / {today["low"][3:]}</span>
         <span>明日: {tomorrow["type"]} {tomorrow["high"][3:]} / {tomorrow["low"][3:]}</span>
     </div>
-    {seniverse_to_html(seniverse)}
 </div>
         '''.strip()
 
@@ -304,18 +303,21 @@ def fetch_seniverse(location: str) -> Optional[Dict]:
             res = r.json().get('results')
             if res:
                 result['now'] = res[0].get('now', {})
+                result['location_name'] = res[0].get('location', {}).get('name')
         # 逐日预报(免费版3天)
         r = requests.get(f"{base}/weather/daily.json", params={**common, "days": 3}, timeout=10)
         if r.status_code == 200:
             res = r.json().get('results')
             if res:
                 result['daily'] = res[0].get('daily', [])
+                result.setdefault('location_name', res[0].get('location', {}).get('name'))
         # 生活指数
         r = requests.get(f"{base}/life/suggestion.json", params=common, timeout=10)
         if r.status_code == 200:
             res = r.json().get('results')
             if res:
                 result['suggestion'] = res[0].get('suggestion', {})
+                result.setdefault('location_name', res[0].get('location', {}).get('name'))
         if not result:
             logger.warning(f"心知天气无返回数据: {location}")
             return None
@@ -326,13 +328,59 @@ def fetch_seniverse(location: str) -> Optional[Dict]:
         return None
 
 
-def seniverse_to_html(seniverse: Optional[Dict]) -> str:
-    """将心知生活指数渲染为标签块，作为 itboy 主数据源的补充。"""
+def seniverse_card_html(seniverse: Optional[Dict], city_label: str = "") -> str:
+    """将心知天气完整渲染为独立卡片（实况 + 3天预报 + 生活指数），与 itboy 卡片并列。"""
+    # 无数据：明确提示原因
     if not seniverse:
-        return ""
-    sug = seniverse.get('suggestion')
-    if not sug:
-        return ""
+        return f'''
+<div style="{STYLE_CITY_CARD}">
+    <div style="{STYLE_CITY_HEADER}">
+        <div style="{STYLE_CITY_NAME}">🛰️ 心知天气 · {city_label}</div>
+    </div>
+    <div style="font-size:11px;color:#999;">⚠️ 无数据（未配置 SENIVERSE_API_KEY，或该城市免费版无权限 AP010006）</div>
+</div>
+        '''.strip()
+
+    loc = seniverse.get('location_name') or city_label
+    now = seniverse.get('now') or {}
+    daily = seniverse.get('daily') or []
+    sug = seniverse.get('suggestion') or {}
+
+    # 实况（免费版仅 text/code/temperature 三项，付费字段有则返回）
+    temp = now.get('temperature')
+    temp_str = f"{temp}℃" if temp is not None else "—"
+    now_line = f"{now.get('text', '—')}  {temp_str}"
+    extras = []
+    if now.get('feels_like') is not None:
+        extras.append(f"体感 {now.get('feels_like')}℃")
+    if now.get('wind_direction'):
+        extras.append(f"{now.get('wind_direction')} {now.get('wind_speed')}km/h")
+    if now.get('humidity') is not None:
+        extras.append(f"湿度 {now.get('humidity')}%")
+    extra_line = (f'<div style="font-size:10px;color:#777;margin-top:4px;">{" · ".join(extras)}</div>'
+                  if extras else '')
+
+    # 逐日预报（免费版 3 天，含可能的风/湿度/降水）
+    daily_line = ""
+    if daily:
+        day_parts = []
+        for d in daily:
+            e = []
+            if d.get('wind_speed'):
+                e.append(f"风{d.get('wind_speed')}km/h")
+            if d.get('humidity'):
+                e.append(f"湿{d.get('humidity')}%")
+            if d.get('rainfall'):
+                e.append(f"降水{d.get('rainfall')}mm")
+            ex = f"[{' '.join(e)}]" if e else ""
+            day_parts.append(
+                f"{d.get('date', '')[-5:]} {d.get('text_day', '')}/{d.get('text_night', '')} "
+                f"{d.get('low', '')}~{d.get('high', '')}℃{ex}"
+            )
+        daily_line = (f'<div style="font-size:10px;color:#555;margin-top:6px;line-height:1.6;">'
+                      f'📅 {" ｜ ".join(day_parts)}</div>')
+
+    # 生活指数
     chips = []
     for key, val in sug.items():
         name = SUGGESTION_NAMES.get(key, key)
@@ -343,13 +391,18 @@ def seniverse_to_html(seniverse: Optional[Dict]) -> str:
                 f'border-radius:4px;font-size:10px;margin:2px;display:inline-block;">'
                 f'{name}·{brief}</span>'
             )
-    if not chips:
-        return ""
+    chips_html = f'<div style="line-height:1.6;margin-top:6px;">{"".join(chips)}</div>' if chips else ''
+
     return f'''
-    <div style="margin-top:8px;padding-top:6px;border-top:1px dashed #e0e0e0;">
-        <div style="font-size:10px;color:#999;margin-bottom:4px;">🛰️ 心知天气 · 生活指数</div>
-        <div style="line-height:1.6;">{"".join(chips)}</div>
+<div style="{STYLE_CITY_CARD}">
+    <div style="{STYLE_CITY_HEADER}">
+        <div style="{STYLE_CITY_NAME}">🛰️ 心知天气 · {loc}</div>
     </div>
+    <div style="{STYLE_TEMP}">{now_line}</div>
+    {extra_line}
+    {daily_line}
+    {chips_html}
+</div>
     '''.strip()
 
 
@@ -447,14 +500,20 @@ def main():
     # 获取每日英语
     iciba_result = fetch_iciba()
 
-    # 构建HTML内容
+    # 构建HTML内容：每个城市拆成两块 —— ① itboy 数据卡片 ② 心知天气数据卡片
     weather_htmls = []
     for i, result in enumerate(weather_results):
+        # ① itboy 天气卡片
         if isinstance(result, Dict) and result:
-            weather_htmls.append(weather_to_html(result, seniverse_results[i]))
+            weather_htmls.append(weather_to_html(result))
+            ci = result.get("cityInfo", {})
+            city_label = f"{ci.get('parent', '')} {ci.get('city', '')}".strip() or city_codes[i]
         else:
             logger.error(f"获取城市 {city_codes[i]} 天气失败")
             weather_htmls.append(f'<div style="{STYLE_CITY_CARD}">⚠️ {city_codes[i]} 天气获取失败</div>')
+            city_label = city_codes[i]
+        # ② 心知天气卡片（完整展示 实况 / 3天预报 / 生活指数）
+        weather_htmls.append(seniverse_card_html(seniverse_results[i], city_label))
 
     # 组装完整HTML
     current_time = time.strftime("%Y-%m-%d %H:%M", time.localtime())
