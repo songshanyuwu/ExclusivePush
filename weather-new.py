@@ -207,21 +207,16 @@ def _chip(text: str) -> str:
             f'padding:2px 9px;margin:2px;font-size:10px;line-height:1.6;">{text}</span>')
 
 
-def _circle_block(inner_html: str) -> str:
-    """外围带圆角边框的内容块，用于风力/空气/湿度、生活指数等需要强调的两行。"""
-    return (f'<div style="border:1px solid #e3e8f0;border-radius:8px;'
-            f'padding:8px 10px;margin:6px 0;line-height:1.9;">{inner_html}</div>')
-
-
 def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label: str) -> str:
     """将单个城市双源数据(itboy + 心知)整合为紧凑卡片。
 
     布局顺序（按用户指定）：
-      头部(城市名+itboy天气 | 心知当前)
-      → 风力/空气/湿度(内容块·圆形 chip·名称：值·外围带圈)
+      头部(城市名单行 + 换行显示 itboy天气 | 心知当前)
+      → 风力/空气/湿度(圆形 chip·名称：值·无外围带圈)
       → itboy 近三天(逐行) → 心知未来三天(逐行·与近三天格式一致·含星期)
-      → 生活指数(内容块·圆形 chip·名称：值·外围带圈) → 温馨提示
+      → 生活指数(圆形 chip + emoji·名称：值·无外围带圈) → 温馨提示
     itboy 温度保留原始 '高温 33℃' / '低温 25℃' 文本，不做裁剪。
+    风力块、生活指数块均不套外围圆角边框，仅保留各自圆形 chip。
     """
     # ---------- itboy 解析 ----------
     ib_ok = isinstance(itboy, Dict) and bool(itboy)
@@ -261,21 +256,23 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
     else:
         sx_now_str = '🛰️ 无数据'
     header = (f'<div style="font-size:15px;font-weight:bold;color:#667eea;'
-              f'margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0f0f0;">'
-              f'📍 {city_name} &nbsp; {ib_weather} &nbsp;|&nbsp; '
+              f'margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #f0f0f0;">'
+              f'📍 {city_name}</div>'
+              f'<div style="font-size:13px;color:#333;margin-bottom:6px;">'
+              f'{ib_weather} &nbsp;|&nbsp; '
               f'<span style="font-weight:normal;color:#333;">{sx_now_str}</span></div>')
 
-    # ---------- 风力/空气/湿度：内容块（圆形 chip · 外围带圈 · 名称：值 风格）----------
+    # ---------- 风力/空气/湿度：圆形 chip（无外围带圈）----------
     if ib_ok:
         wx_chips = ''.join([
             _chip(f'💨 风力：{fx} {fl}'),
             _chip(f'🌫️ 空气：{quality}'),
             _chip(f'💧 湿度：{shidu}'),
         ])
-        wx_block = _circle_block(wx_chips)
+        wx_block = f'<div style="margin-bottom:6px;line-height:1.8;">{wx_chips}</div>'
     else:
-        wx_block = _circle_block('<span style="font-size:10px;color:#999;">'
-                                 'itboy 天气获取失败，无法展示风力/空气/湿度</span>')
+        wx_block = ('<div style="margin-bottom:6px;font-size:10px;color:#999;">'
+                    'itboy 天气获取失败，无法展示风力/空气/湿度</div>')
 
     # ---------- itboy 近三天（逐行，与未来三天格式一致）----------
     if ib_ok:
@@ -310,19 +307,21 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
     else:
         seniverse_future = '<div style="font-size:10px;color:#999;margin:4px 0;">🛰️ 未来三天：无数据</div>'
 
-    # ---------- 生活指数：内容块（圆形 chip · 外围带圈 · 名称：值 风格）----------
+    # ---------- 生活指数：圆形 chip + emoji（无外围带圈，风格对齐风力行）----------
     sx_sug = seniverse.get('suggestion') if isinstance(seniverse, Dict) else None
     sug_chips = []
     if isinstance(sx_sug, Dict):
         for key, val in sx_sug.items():
             name = SUGGESTION_NAMES.get(key, key)
+            emoji = SUGGESTION_EMOJI.get(key, "•")
             brief = val.get('brief', '') if isinstance(val, Dict) else ''
             if brief:
-                sug_chips.append(_chip(f'{name}：{brief}'))
+                sug_chips.append(_chip(f'{emoji} {name}：{brief}'))
     if sug_chips:
-        sug_block = _circle_block(''.join(sug_chips))
+        sug_block = f'<div style="margin-bottom:6px;line-height:1.8;">{"".join(sug_chips)}</div>'
     else:
-        sug_block = _circle_block('<span style="font-size:10px;color:#999;">🛰️ 生活指数：无数据</span>')
+        sug_block = ('<div style="margin-bottom:6px;font-size:10px;color:#999;">'
+                     '🛰️ 生活指数：无数据</div>')
 
     # ---------- 温馨提示 ----------
     notice_block = f'<div style="{STYLE_NOTICE}">💡 {notice}</div>' if (ib_ok and notice) else ''
@@ -364,6 +363,16 @@ SUGGESTION_NAMES = {
     "umbrella": "雨伞", "flu": "感冒", "air_conditioner": "空调",
     "sunscreen": "防晒", "makeup": "化妆", "traffic": "交通",
     "spiritual": "心情",
+}
+
+# 生活指数对应 emoji 图标，与风力行(💨/🌫️/💧)风格保持一致
+SUGGESTION_EMOJI = {
+    "car_washing": "🚗", "dressing": "👕", "comfort": "😌",
+    "sport": "🏃", "uv": "☀️", "travel": "🧳",
+    "fishing": "🎣", "air_pollution": "🏭", "allergy": "🤧",
+    "umbrella": "☂️", "flu": "🤒", "air_conditioner": "❄️",
+    "sunscreen": "🧴", "makeup": "💄", "traffic": "🚦",
+    "spiritual": "💗",
 }
 
 
