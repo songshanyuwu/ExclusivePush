@@ -321,7 +321,7 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
             wk = _weekday_cn(d.get('date', ''))
             date_cell = f"{d.get('date', '')[-5:]} {wk}".strip()  # '07-16 周四'
             flines.append(
-                f'📅 {date_cell} &nbsp; {d.get("text_day", "")}/{d.get("text_night", "")} '
+                f'{date_cell} &nbsp; {d.get("text_day", "")}/{d.get("text_night", "")} '
                 f'&nbsp; {d.get("low", "")}~{d.get("high", "")}℃{detail}'
             )
         seniverse_future = (f'<div style="font-size:10px;color:#555;line-height:1.8;margin:4px 0;">'
