@@ -234,7 +234,7 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
     """将单个城市双源数据(itboy + 心知)整合为紧凑卡片。
 
     布局顺序（按用户指定）：
-      头部(城市名单行 + 换行显示 itboy天气 | 心知当前)
+      头部(城市名单行 + 换行显示 itboy天气   心知当前)
       → 风力/空气/湿度(圆形 chip·名称：值·无外围带圈)
       → itboy 近三天(逐行) → 心知未来三天(逐行·与近三天格式一致·含星期)
       → 生活指数(圆形 chip + emoji·名称：值·无外围带圈) → 温馨提示
@@ -281,7 +281,7 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
     header = (f'<div style="{STYLE_CONTAINER}font-size:16px;font-weight:bold;">'
               f'📍 {city_name}</div>'
               f'<div style="font-size:13px;color:#333;margin-bottom:6px;">'
-              f'{ib_weather} &nbsp;|&nbsp; '
+              f'{ib_weather} &nbsp;&nbsp;|&nbsp;&nbsp; '
               f'<span style="font-weight:normal;color:#333;">{sx_now_str}</span></div>')
 
     # ---------- 风力/空气/湿度：圆形 chip（无外围带圈）----------
@@ -299,9 +299,9 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
     # ---------- itboy 近三天（逐行，与未来三天格式一致）----------
     if ib_ok:
         near3 = (f'<div style="font-size:10px;color:#777;line-height:1.8;margin:4px 0;">'
-                 f'昨日    {y_type}    {y_high} / {y_low}<br>'
-                 f'今日    {t_type}    {t_high} / {t_low}<br>'
-                 f'明日    {mo_type}    {mo_high} / {mo_low}</div>')
+                 f'昨日  &nbsp; &nbsp; {y_type}  &nbsp; &nbsp; {y_high} / {y_low}<br>'
+                 f'今日  &nbsp; &nbsp; {t_type}  &nbsp; &nbsp; {t_high} / {t_low}<br>'
+                 f'明日  &nbsp; &nbsp; {mo_type}  &nbsp; &nbsp; {mo_high} / {mo_low}</div>')
     else:
         near3 = '<div style="font-size:10px;color:#999;margin:4px 0;">itboy 天气获取失败</div>'
 
