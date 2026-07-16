@@ -255,8 +255,7 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
                       if sx_temp is not None else f'🛰️ {sx_now.get("text", "—")}')
     else:
         sx_now_str = '🛰️ 无数据'
-    header = (f'<div style="font-size:15px;font-weight:bold;color:#667eea;'
-              f'margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #f0f0f0;">'
+    header = (f'<div style="{STYLE_CONTAINER}font-size:16px;font-weight:bold;">'
               f'📍 {city_name}</div>'
               f'<div style="font-size:13px;color:#333;margin-bottom:6px;">'
               f'{ib_weather} &nbsp;|&nbsp; '
@@ -277,9 +276,9 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
     # ---------- itboy 近三天（逐行，与未来三天格式一致）----------
     if ib_ok:
         near3 = (f'<div style="font-size:10px;color:#777;line-height:1.8;margin:4px 0;">'
-                 f'昨日 {y_type} {y_high} / {y_low}<br>'
-                 f'今日 {t_type} {t_high} / {t_low}<br>'
-                 f'明日 {mo_type} {mo_high} / {mo_low}</div>')
+                 f'昨日&nbsp;&nbsp;&nbsp;&nbsp;{y_type} {y_high} / {y_low}<br>'
+                 f'今日&nbsp;&nbsp;&nbsp;&nbsp;{t_type} {t_high} / {t_low}<br>'
+                 f'明日&nbsp;&nbsp;&nbsp;&nbsp;{mo_type} {mo_high} / {mo_low}</div>')
     else:
         near3 = '<div style="font-size:10px;color:#999;margin:4px 0;">itboy 天气获取失败</div>'
 
@@ -525,15 +524,8 @@ def main():
             logger.error(f"获取城市 {city_codes[i]} 天气失败")
         weather_htmls.append(city_block_html(result, seniverse_results[i], city_label))
 
-    # 组装完整HTML
-    current_time = time.strftime("%Y-%m-%d %H:%M", time.localtime())
-
+    # 组装完整HTML（标题块已移除，渐变样式改为每个城市名称头部使用）
     full_html = f'''
-<div style="{STYLE_CONTAINER}">
-    <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px;">🌤️ 今日天气</div>
-    <div style="font-size: 11px; opacity: 0.85;">{current_time}</div>
-</div>
-
 {' '.join(weather_htmls)}
 
 {iciba_to_html(iciba_result)}
