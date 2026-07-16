@@ -1,20 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-天气推送脚本 - 紧凑版
-功能：获取多城市天气、精美HTML展示、完整错误处理、兼容PushPlus
-优化：紧凑排版设计
+天气推送脚本
+
+功能：获取多城市天气（itboy 为主数据源，心知天气免费版作补充），
+生成精美 HTML 卡片，通过 PushPlus / Server 酱推送，并附带每日英语。
+所有网络请求失败时优雅降级，不中断整体流程。
 """
 
+import json
 import logging
 import os
 import time
 from datetime import datetime
+from typing import Dict, Optional
+
 import requests
-import json
-from typing import List, Dict, Optional
 
 # ==================== 配置 ====================
 
+# 日志
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -22,24 +26,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 推送配置
-PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY')
-SERVERSCKEY = os.environ.get('SERVERSCKEY')
-COOLSCKEY = os.environ.get('COOLSCKEY')
+# 推送通道（从环境变量读取，未配置则跳过对应通道）
+PUSHPLUSSCKEY = os.environ.get('PUSHPLUSSCKEY')   # PushPlus 令牌
+SERVERSCKEY = os.environ.get('SERVERSCKEY')         # Server 酱令牌
 
-# 心知天气(免费版) 补充数据源配置
+# 心知天气（免费版）补充数据源
 # 私钥从环境变量读取，切勿明文写入文件或提交仓库
 SENIVERSE_API_KEY = os.environ.get('SENIVERSE_API_KEY')
-# itboy城市编码 -> 心知查询位置(拼音/城市)。蓬莱心知免费版无该城市(AP010006)，映射至所属地级市烟台
+# itboy 城市编码 -> 心知查询位置（拼音/城市）。
+# 蓬莱在心知免费版无数据权限(AP010006)，映射至所属地级市烟台。
 SENIVERSE_CITY_MAP = {
     '101120101': 'jinan',     # 济南
-    '101120504': 'yantai',    # 蓬莱(心知无该城市, 用烟台)
+    '101120504': 'yantai',    # 蓬莱（心知无该城市，用烟台）
     '101121201': 'dongying',  # 东营
     '101010300': 'beijing',   # 北京
 }
 
-# ==================== 样式定义（内联样式，兼容PushPlus）- 紧凑版 ====================
+# 默认城市列表（济南/蓬莱(映射烟台)/东营/北京），可用环境变量 WEATHER_CITY_CODES 覆盖
+DEFAULT_CITY_CODES = '101120101,101120504,101121201,101010300'
 
+# ==================== 内联样式（兼容 PushPlus 邮件渲染） ====================
+# 仅保留实际使用的样式，避免冗余；均为内联，无需外部 CSS。
+
+# 城市名称头部：紫蓝渐变背景条
 STYLE_CONTAINER = '''
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -49,6 +58,7 @@ color: white;
 margin-bottom: 10px;
 '''.strip()
 
+# 单个城市卡片容器：白底圆角 + 轻阴影
 STYLE_CITY_CARD = '''
 background: white;
 border-radius: 8px;
@@ -58,59 +68,7 @@ box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 color: #333;
 '''.strip()
 
-STYLE_CITY_HEADER = '''
-display: flex;
-align-items: center;
-justify-content: space-between;
-margin-bottom: 8px;
-padding-bottom: 6px;
-border-bottom: 1px solid #f0f0f0;
-'''.strip()
-
-STYLE_CITY_NAME = '''
-font-size: 15px;
-font-weight: bold;
-color: #667eea;
-'''.strip()
-
-STYLE_WEATHER_ICON = '''
-font-size: 24px;
-'''.strip()
-
-STYLE_TEMP = '''
-font-size: 20px;
-font-weight: bold;
-color: #ff6b6b;
-margin: 6px 0;
-'''.strip()
-
-STYLE_INFO_GRID = '''
-display: grid;
-grid-template-columns: 1fr 1fr 1fr;
-gap: 5px;
-margin-top: 6px;
-'''.strip()
-
-STYLE_INFO_ITEM = '''
-background: #f8f9fa;
-padding: 4px 6px;
-border-radius: 4px;
-font-size: 10px;
-color: #555;
-'''.strip()
-
-STYLE_LABEL = '''
-color: #999;
-font-size: 9px;
-margin-bottom: 1px;
-'''.strip()
-
-STYLE_VALUE = '''
-color: #333;
-font-weight: 500;
-font-size: 10px;
-'''.strip()
-
+# 温馨提示：暖色渐变块
 STYLE_NOTICE = '''
 background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
 padding: 8px 10px;
@@ -121,13 +79,7 @@ font-size: 10px;
 line-height: 1.3;
 '''.strip()
 
-STYLE_FORECAST = '''
-margin-top: 6px;
-font-size: 10px;
-color: #999;
-line-height: 1.5;
-'''.strip()
-
+# 每日英语区块
 STYLE_ENGLISH = '''
 background: #f0f4ff;
 padding: 10px;
@@ -135,24 +87,40 @@ border-radius: 6px;
 margin-top: 10px;
 border-left: 3px solid #667eea;
 '''.strip()
-
 STYLE_ENGLISH_TITLE = '''
 font-size: 12px;
 font-weight: bold;
 color: #667eea;
 margin-bottom: 4px;
 '''.strip()
-
 STYLE_ENGLISH_CONTENT = '''
 color: #555;
 font-size: 12px;
 line-height: 1.4;
 '''.strip()
 
-# ==================== 数据获取 ====================
+# ==================== 通用工具 ====================
+
+def _weekday_cn(date_str: str) -> str:
+    """由 'YYYY-MM-DD' 计算中文星期，如 '周四'；解析失败返回空串。"""
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return "周" + "一二三四五六日"[dt.weekday()]
+    except (ValueError, TypeError):
+        return ""
+
+
+def _chip(text: str) -> str:
+    """统一风格的圆形 tag，风力/空气/湿度、生活指数共用。"""
+    return (f'<span style="display:inline-block;background:#f5f7ff;color:#667eea;'
+            f'border:1px solid #c7d0f5;border-radius:12px;'
+            f'padding:2px 9px;margin:2px;font-size:10px;line-height:1.6;">{text}</span>')
+
+
+# ==================== 数据源：itboy 天气 + 每日英语 ====================
 
 def fetch_weather(city_code: str) -> Optional[Dict]:
-    """获取单个城市天气（同步）"""
+    """获取单个城市天气（itboy 主数据源，同步请求）。失败返回 None。"""
     try:
         url = f'http://t.weather.itboy.net/api/weather/city/{city_code}'
         response = requests.get(url, timeout=15)
@@ -174,7 +142,7 @@ def fetch_weather(city_code: str) -> Optional[Dict]:
 
 
 def fetch_iciba() -> Optional[Dict]:
-    """获取每日英语"""
+    """获取每日英语（金山词霸开放接口）。失败返回 None。"""
     try:
         url = 'http://open.iciba.com/dsapi/'
         response = requests.get(url, timeout=15)
@@ -191,21 +159,76 @@ def fetch_iciba() -> Optional[Dict]:
         return None
 
 
-def _weekday_cn(date_str: str) -> str:
-    """由 'YYYY-MM-DD' 计算中文星期，如 '周四'；解析失败返回空串。"""
+# ==================== 数据源：心知天气（免费版补充） ====================
+
+# 生活指数键名 -> 中文名（用于展示，未知键回退为原键名）
+SUGGESTION_NAMES = {
+    "car_washing": "洗车", "dressing": "穿衣", "comfort": "舒适度",
+    "sport": "运动", "uv": "紫外线", "travel": "旅游",
+    "fishing": "钓鱼", "air_pollution": "空气污染扩散", "allergy": "过敏",
+    "umbrella": "雨伞", "flu": "感冒", "air_conditioner": "空调",
+    "sunscreen": "防晒", "makeup": "化妆", "traffic": "交通",
+    "spiritual": "心情",
+}
+
+# 生活指数键名 -> emoji 图标，与风力行(💨/🌫️/💧)风格保持一致
+SUGGESTION_EMOJI = {
+    "car_washing": "🚗", "dressing": "👕", "comfort": "😌",
+    "sport": "🏃", "uv": "☀️", "travel": "🧳",
+    "fishing": "🎣", "air_pollution": "🏭", "allergy": "🤧",
+    "umbrella": "☂️", "flu": "🤒", "air_conditioner": "❄️",
+    "sunscreen": "🧴", "makeup": "💄", "traffic": "🚦",
+    "spiritual": "💗",
+}
+
+
+def fetch_seniverse(location: str) -> Optional[Dict]:
+    """获取心知天气（免费版）数据：实况 + 3天预报 + 生活指数。
+
+    免费版限制：实况仅返回 text/code/temperature 三项；部分城市(如蓬莱)无数据权限(AP010006)。
+    需配置环境变量 SENIVERSE_API_KEY（私钥）。返回 None 表示未配置或获取失败。
+    """
+    if not SENIVERSE_API_KEY:
+        logger.warning("未配置 SENIVERSE_API_KEY，跳过心知数据源")
+        return None
+    if not location:
+        return None
+    base = "https://api.seniverse.com/v3"
+    common = {"key": SENIVERSE_API_KEY, "location": location, "language": "zh-Hans", "unit": "c"}
+    result = {}
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        return "周" + "一二三四五六日"[dt.weekday()]
-    except (ValueError, TypeError):
-        return ""
+        # 实况
+        r = requests.get(f"{base}/weather/now.json", params=common, timeout=10)
+        if r.status_code == 200:
+            res = r.json().get('results')
+            if res:
+                result['now'] = res[0].get('now', {})
+                result['location_name'] = res[0].get('location', {}).get('name')
+        # 逐日预报（免费版 3 天）
+        r = requests.get(f"{base}/weather/daily.json", params={**common, "days": 3}, timeout=10)
+        if r.status_code == 200:
+            res = r.json().get('results')
+            if res:
+                result['daily'] = res[0].get('daily', [])
+                result.setdefault('location_name', res[0].get('location', {}).get('name'))
+        # 生活指数
+        r = requests.get(f"{base}/life/suggestion.json", params=common, timeout=10)
+        if r.status_code == 200:
+            res = r.json().get('results')
+            if res:
+                result['suggestion'] = res[0].get('suggestion', {})
+                result.setdefault('location_name', res[0].get('location', {}).get('name'))
+        if not result:
+            logger.warning(f"心知天气无返回数据: {location}")
+            return None
+        logger.info(f"心知天气获取成功: {location}")
+        return result
+    except Exception as e:
+        logger.error(f"心知天气获取异常: {location}, 错误: {e}")
+        return None
 
 
-def _chip(text: str) -> str:
-    """统一风格圆形 tag（风力/空气/湿度、生活指数 共用）。"""
-    return (f'<span style="display:inline-block;background:#f5f7ff;color:#667eea;'
-            f'border:1px solid #c7d0f5;border-radius:12px;'
-            f'padding:2px 9px;margin:2px;font-size:10px;line-height:1.6;">{text}</span>')
-
+# ==================== HTML 渲染 ====================
 
 def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label: str) -> str:
     """将单个城市双源数据(itboy + 心知)整合为紧凑卡片。
@@ -338,7 +361,7 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
 
 
 def iciba_to_html(data: Dict) -> str:
-    """将每日英语转换为美化HTML（紧凑版）"""
+    """将每日英语转换为美化 HTML。无数据返回空串。"""
     if not data:
         return ""
 
@@ -353,78 +376,10 @@ def iciba_to_html(data: Dict) -> str:
     '''.strip()
 
 
-# ==================== 心知天气(免费版) 补充数据源 ====================
-
-SUGGESTION_NAMES = {
-    "car_washing": "洗车", "dressing": "穿衣", "comfort": "舒适度",
-    "sport": "运动", "uv": "紫外线", "travel": "旅游",
-    "fishing": "钓鱼", "air_pollution": "空气污染扩散", "allergy": "过敏",
-    "umbrella": "雨伞", "flu": "感冒", "air_conditioner": "空调",
-    "sunscreen": "防晒", "makeup": "化妆", "traffic": "交通",
-    "spiritual": "心情",
-}
-
-# 生活指数对应 emoji 图标，与风力行(💨/🌫️/💧)风格保持一致
-SUGGESTION_EMOJI = {
-    "car_washing": "🚗", "dressing": "👕", "comfort": "😌",
-    "sport": "🏃", "uv": "☀️", "travel": "🧳",
-    "fishing": "🎣", "air_pollution": "🏭", "allergy": "🤧",
-    "umbrella": "☂️", "flu": "🤒", "air_conditioner": "❄️",
-    "sunscreen": "🧴", "makeup": "💄", "traffic": "🚦",
-    "spiritual": "💗",
-}
-
-
-def fetch_seniverse(location: str) -> Optional[Dict]:
-    """获取心知天气(免费版)数据：实况 + 3天预报 + 生活指数。
-
-    免费版限制：实况仅返回 text/code/temperature 三项；部分城市(如蓬莱)无数据权限(AP010006)。
-    需配置环境变量 SENIVERSE_API_KEY（私钥）。返回 None 表示未配置或获取失败。
-    """
-    if not SENIVERSE_API_KEY:
-        logger.warning("未配置 SENIVERSE_API_KEY，跳过心知数据源")
-        return None
-    if not location:
-        return None
-    base = "https://api.seniverse.com/v3"
-    common = {"key": SENIVERSE_API_KEY, "location": location, "language": "zh-Hans", "unit": "c"}
-    result = {}
-    try:
-        # 实况
-        r = requests.get(f"{base}/weather/now.json", params=common, timeout=10)
-        if r.status_code == 200:
-            res = r.json().get('results')
-            if res:
-                result['now'] = res[0].get('now', {})
-                result['location_name'] = res[0].get('location', {}).get('name')
-        # 逐日预报(免费版3天)
-        r = requests.get(f"{base}/weather/daily.json", params={**common, "days": 3}, timeout=10)
-        if r.status_code == 200:
-            res = r.json().get('results')
-            if res:
-                result['daily'] = res[0].get('daily', [])
-                result.setdefault('location_name', res[0].get('location', {}).get('name'))
-        # 生活指数
-        r = requests.get(f"{base}/life/suggestion.json", params=common, timeout=10)
-        if r.status_code == 200:
-            res = r.json().get('results')
-            if res:
-                result['suggestion'] = res[0].get('suggestion', {})
-                result.setdefault('location_name', res[0].get('location', {}).get('name'))
-        if not result:
-            logger.warning(f"心知天气无返回数据: {location}")
-            return None
-        logger.info(f"心知天气获取成功: {location}")
-        return result
-    except Exception as e:
-        logger.error(f"心知天气获取异常: {location}, 错误: {e}")
-        return None
-
-
-# ==================== 推送功能 ====================
+# ==================== 推送通道 ====================
 
 def push_plus(title: str, content: str) -> bool:
-    """PushPlus推送"""
+    """PushPlus 推送（HTML 模板）。未配置令牌返回 False。"""
     try:
         if not PUSHPLUSSCKEY:
             logger.error("未设置 PUSHPLUSSCKEY")
@@ -460,7 +415,7 @@ def push_plus(title: str, content: str) -> bool:
 
 
 def server_push(title: str, content: str) -> bool:
-    """Server酱推送"""
+    """Server 酱推送。未配置令牌返回 False。"""
     try:
         if not SERVERSCKEY:
             logger.warning("未设置 SERVERSCKEY，跳过Server酱推送")
@@ -489,33 +444,33 @@ def server_push(title: str, content: str) -> bool:
 # ==================== 主程序 ====================
 
 def main():
-    """主函数"""
+    """主流程：拉取天气 -> 组装 HTML -> 推送。"""
     start_time = time.time()
 
     logger.info("=" * 50)
-    logger.info("天气推送脚本启动（紧凑版）")
+    logger.info("天气推送脚本启动")
     logger.info("=" * 50)
 
-    # 城市列表（可以从环境变量读取，方便配置）
-    city_codes_str = os.environ.get('WEATHER_CITY_CODES', '101120101,101120504,101121201,101010300')
+    # 城市列表：默认济南/蓬莱(映射烟台)/东营/北京，可用环境变量 WEATHER_CITY_CODES 覆盖
+    city_codes_str = os.environ.get('WEATHER_CITY_CODES', DEFAULT_CITY_CODES)
     city_codes = [code.strip() for code in city_codes_str.split(',')]
 
     logger.info(f"将获取 {len(city_codes)} 个城市的天气: {city_codes}")
 
-    # 顺序获取所有城市天气（城市少，同步足够）
+    # 顺序获取所有城市天气（城市少，同步足够）；并行补充心知数据源
     weather_results = []
     seniverse_results = []
     for code in city_codes:
         result = fetch_weather(code)
         weather_results.append(result)
-        # 并行获取心知天气(免费版)作为补充数据源；按城市编码映射其查询位置
+        # 按城市编码映射心知查询位置
         sen_loc = SENIVERSE_CITY_MAP.get(code)
         seniverse_results.append(fetch_seniverse(sen_loc) if sen_loc else None)
 
     # 获取每日英语
     iciba_result = fetch_iciba()
 
-    # 构建HTML内容：每个城市整合为单块(6行) —— itboy 与 心知双源并列
+    # 构建 HTML：每个城市整合为单块（itboy + 心知双源并列）
     weather_htmls = []
     for i, result in enumerate(weather_results):
         ci = result.get("cityInfo", {}) if isinstance(result, Dict) else {}
@@ -524,7 +479,7 @@ def main():
             logger.error(f"获取城市 {city_codes[i]} 天气失败")
         weather_htmls.append(city_block_html(result, seniverse_results[i], city_label))
 
-    # 组装完整HTML（标题块已移除，渐变样式改为每个城市名称头部使用）
+    # 组装完整 HTML（标题块已移除，渐变样式用于各城市名称头部）
     full_html = f'''
 {' '.join(weather_htmls)}
 
@@ -535,12 +490,10 @@ def main():
     title = f"🌤️ 今日天气播报"
 
     success = True
-    # PushPlus推送
     if PUSHPLUSSCKEY:
         if not push_plus(title, full_html):
             success = False
 
-    # Server酱推送（如果配置了）
     if SERVERSCKEY:
         if not server_push(title, full_html):
             success = False
@@ -556,10 +509,10 @@ def main():
 
 
 if __name__ == '__main__':
-    # 腾讯云SCF入口
+    # 腾讯云 SCF 入口（部署为云函数时由平台调用此 handler）
     def main_handler(event, context):
         main()
         return '执行完成'
 
-    # 本地/服务器/GitHub Actions入口
+    # 本地 / 服务器 / GitHub Actions 入口
     main()
