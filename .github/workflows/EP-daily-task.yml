@@ -64,7 +64,8 @@ jobs:
         SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
         QMSGSCKEY: ${{ secrets.QMSGSCKEY }}
-      run: python weather.py
+      # run: python weather.py
+      run: python weather-new.py
       
       # 运行脚本
     - name: 'Working2'
