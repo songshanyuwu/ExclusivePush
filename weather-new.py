@@ -3,16 +3,17 @@
 天气推送脚本
 
 功能：获取多城市天气（itboy 为主数据源，心知天气免费版作补充），
-生成精美 HTML 卡片，通过 PushPlus / Server 酱推送，并附带每日英语。
+生成移动端优化的精美 HTML 卡片，通过 PushPlus / Server 酱推送，并附带每日英语。
 所有网络请求失败时优雅降级，不中断整体流程。
 """
 
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import requests
 
@@ -45,46 +46,27 @@ SENIVERSE_CITY_MAP = {
 # 默认城市列表（济南/蓬莱(映射烟台)/东营/北京），可用环境变量 WEATHER_CITY_CODES 覆盖
 DEFAULT_CITY_CODES = '101120101,101120504,101121201,101010300'
 
-# ==================== 内联样式（兼容 PushPlus 邮件渲染） ====================
-# 仅保留实际使用的样式，避免冗余；均为内联，无需外部 CSS。
+# ==================== 内联样式（兼容 PushPlus / 微信 WebView 渲染） ====================
+# 全部内联；优先使用 inline-block / flex（现代微信 WebView 均支持），间距用 margin 而非 gap
+# 以保证旧版安卓 WebView 兼容。
 
-# 城市名称头部：紫蓝渐变背景条
-STYLE_CONTAINER = '''
-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-padding: 12px 14px;
-border-radius: 10px;
-color: white;
-margin-bottom: 10px;
-'''.strip()
-
-# 单个城市卡片容器：白底圆角 + 轻阴影
-STYLE_CITY_CARD = '''
-background: white;
-border-radius: 8px;
-padding: 12px 14px;
-margin-bottom: 8px;
-box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-color: #333;
-'''.strip()
-
-# 温馨提示：暖色渐变块
+# 温馨提示：暖色块
 STYLE_NOTICE = '''
-background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-padding: 8px 10px;
-border-radius: 6px;
-margin-top: 8px;
-color: #8b4513;
-font-size: 10px;
-line-height: 1.3;
+background: #fff7ed;
+padding: 10px 12px;
+border-radius: 10px;
+margin-top: 12px;
+color: #b45309;
+font-size: 12px;
+line-height: 1.5;
 '''.strip()
 
 # 每日英语区块
 STYLE_ENGLISH = '''
 background: #f0f4ff;
-padding: 10px;
-border-radius: 6px;
-margin-top: 10px;
+padding: 10px 12px;
+border-radius: 10px;
+margin-top: 14px;
 border-left: 3px solid #667eea;
 '''.strip()
 STYLE_ENGLISH_TITLE = '''
@@ -96,7 +78,7 @@ margin-bottom: 4px;
 STYLE_ENGLISH_CONTENT = '''
 color: #555;
 font-size: 12px;
-line-height: 1.4;
+line-height: 1.5;
 '''.strip()
 
 # ==================== 通用工具 ====================
@@ -110,11 +92,69 @@ def _weekday_cn(date_str: str) -> str:
         return ""
 
 
-def _chip(text: str) -> str:
-    """统一风格的圆形 tag，风力/空气/湿度、生活指数共用。"""
-    return (f'<span style="display:inline-block;background:#f5f7ff;color:#667eea;'
-            f'border:1px solid #c7d0f5;border-radius:12px;'
-            f'padding:2px 9px;margin:2px;font-size:10px;line-height:1.6;">{text}</span>')
+def _temp_num(s: str) -> str:
+    """从 '高温 15℃' / '低温 7℃' 中提取数字，失败返回空串。"""
+    if not s:
+        return ''
+    m = re.search(r'(\d+)', s)
+    return m.group(1) if m else ''
+
+
+def _md(date_str: str) -> str:
+    """由 'YYYY-MM-DD' 取 'M月D日'，失败返回空串。"""
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return f"{dt.month}月{dt.day}日"
+    except (ValueError, TypeError):
+        return ""
+
+
+def cond_emoji(cond: str) -> str:
+    """天气文字 -> emoji 图标。匹配顺序：雷/雹/雪/雨/沙尘/雾/阴/多云/晴。"""
+    c = cond or ''
+    if '雷' in c:
+        return '⛈️'
+    if '冰雹' in c or '雹' in c:
+        return '🌨️'
+    if '雪' in c:
+        return '🌨️'
+    if '雨' in c:
+        return '🌧️'
+    if '沙' in c or '尘' in c:
+        return '🌫️'
+    if '雾' in c or '霾' in c:
+        return '🌫️'
+    if '阴' in c:
+        return '☁️'
+    if '多云' in c:
+        return '⛅'
+    if '晴' in c:
+        return '☀️'
+    return '🌡️'
+
+
+def weather_theme(cond: str):
+    """天气文字 -> (渐变起始色, 渐变结束色)。用于 Hero 头部着色，按天气类型区分配色。"""
+    c = cond or ''
+    if '雷' in c:
+        return ('#3a4a6b', '#5b6b9e')          # 雷阵雨：深蓝紫
+    if '冰雹' in c or '雹' in c:
+        return ('#5b9bd5', '#8ec5fc')          # 冰雹：冰蓝
+    if '雪' in c:
+        return ('#5b9bd5', '#8ec5fc')          # 雪：冰蓝
+    if '雨' in c:
+        return ('#3b7ddd', '#2c5fb0')          # 雨：蓝
+    if '沙' in c or '尘' in c:
+        return ('#c2a878', '#a1885f')          # 沙尘：褐黄
+    if '雾' in c or '霾' in c:
+        return ('#8e9eab', '#b0bec5')          # 雾/霾：灰
+    if '阴' in c:
+        return ('#7b8aa0', '#9aa7b8')          # 阴：灰蓝
+    if '多云' in c:
+        return ('#5b9bd5', '#7bb0e0')          # 多云：天蓝
+    if '晴' in c:
+        return ('#f6b73c', '#f48c3a')          # 晴：暖金
+    return ('#667eea', '#764ba2')              # 默认：紫蓝
 
 
 # ==================== 数据源：itboy 天气 + 每日英语 ====================
@@ -171,7 +211,7 @@ SUGGESTION_NAMES = {
     "spiritual": "心情",
 }
 
-# 生活指数键名 -> emoji 图标，与风力行(💨/🌫️/💧)风格保持一致
+# 生活指数键名 -> emoji 图标
 SUGGESTION_EMOJI = {
     "car_washing": "🚗", "dressing": "👕", "comfort": "😌",
     "sport": "🏃", "uv": "☀️", "travel": "🧳",
@@ -230,16 +270,54 @@ def fetch_seniverse(location: str) -> Optional[Dict]:
 
 # ==================== HTML 渲染 ====================
 
-def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label: str) -> str:
-    """将单个城市双源数据(itboy + 心知)整合为紧凑卡片。
+def _build_forecast(itboy: Optional[Dict]) -> List[Dict]:
+    """构建最近五天：昨天 / 今天 / 未来三天(+1,+2,+3)，今天列高亮。
 
-    布局顺序（按用户指定）：
-      头部(城市名单行 + 换行显示 itboy天气   心知当前)
-      → 风力/空气/湿度(圆形 chip·名称：值·无外围带圈)
-      → itboy 近三天(逐行) → 心知未来三天(逐行·与近三天格式一致·含星期)
-      → 生活指数(圆形 chip + emoji·名称：值·无外围带圈) → 温馨提示
-    itboy 温度保留原始 '高温 33℃' / '低温 25℃' 文本，不做裁剪。
-    风力块、生活指数块均不套外围圆角边框，仅保留各自圆形 chip。
+    数据全部取自 itboy（forecast 含多日、yesterday 含昨日）。
+    返回 [{'label','emoji','high','low','today':bool}, ...]
+    """
+    out = []
+    if not isinstance(itboy, Dict):
+        return out
+    wd = itboy.get('data', {})
+    fc = wd.get('forecast', [])
+    yest = wd.get('yesterday', {})
+    labels = ['今天', '明天', '后天', '大后天']
+
+    # 昨天
+    if isinstance(yest, Dict) and yest:
+        out.append({
+            'label': '昨天',
+            'emoji': cond_emoji(yest.get('type', '')),
+            'high': _temp_num(yest.get('high', '')),
+            'low': _temp_num(yest.get('low', '')),
+            'today': False,
+        })
+    # 今天 + 未来三天
+    for i in range(0, 4):
+        if i < len(fc):
+            t = fc[i]
+            ymd = t.get('ymd') or t.get('date')
+            if i == 0:
+                label = '今天'
+            else:
+                label = _weekday_cn(ymd) or labels[i]
+            out.append({
+                'label': label,
+                'emoji': cond_emoji(t.get('type', '')),
+                'high': _temp_num(t.get('high', '')),
+                'low': _temp_num(t.get('low', '')),
+                'today': (i == 0),
+            })
+    return out
+
+
+def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label: str) -> str:
+    """将单个城市双源数据整合为移动端优化卡片（单城紧凑，不超一屏）。
+
+    结构：
+      [渐变 Hero] 城市 + 日期星期 + 大号温度 + 天气图标 + 一行元信息(风力/湿度/空气/实况)
+      [白色卡片] 最近五天横排(昨天/今天高亮/未来三天) + 生活指数两列对齐网格 + 温馨提示
     """
     # ---------- itboy 解析 ----------
     ib_ok = isinstance(itboy, Dict) and bool(itboy)
@@ -248,116 +326,149 @@ def city_block_html(itboy: Optional[Dict], seniverse: Optional[Dict], city_label
         wd = itboy.get("data", {})
         fc = wd.get("forecast", [])
         today = fc[0] if len(fc) > 0 else {}
-        tomorrow = fc[1] if len(fc) > 1 else {}
         yesterday = wd.get("yesterday", {})
         city_name = f"{city_info.get('parent', '')} {city_info.get('city', '')}".strip() or city_label
         t_type = today.get("type", "")
-        t_high = today.get("high", "")   # 原始: '高温 33℃'
-        t_low = today.get("low", "")     # 原始: '低温 25℃'
+        t_high = _temp_num(today.get("high", ""))   # 取数字，如 '15'
+        t_low = _temp_num(today.get("low", ""))      # 取数字，如 '7'
         y_type = yesterday.get("type", "")
-        y_high = yesterday.get("high", "")
-        y_low = yesterday.get("low", "")
-        mo_type = tomorrow.get("type", "")
-        mo_high = tomorrow.get("high", "")
-        mo_low = tomorrow.get("low", "")
+        y_high = _temp_num(yesterday.get("high", ""))
+        y_low = _temp_num(yesterday.get("low", ""))
         fx, fl = today.get("fx", ""), today.get("fl", "")
         quality = wd.get("quality", "")
         shidu = wd.get("shidu", "")
         notice = today.get("notice", "")
+        today_ymd = today.get("ymd") or today.get("date")
     else:
         city_name = city_label
         t_type = t_high = t_low = y_type = y_high = y_low = ""
-        mo_type = mo_high = mo_low = fx = fl = quality = shidu = notice = ""
+        fx = fl = quality = shidu = notice = today_ymd = ""
 
-    # ---------- 头部：城市名 + itboy天气 + 分隔 + 心知当前 ----------
-    ib_weather = f'{t_type} {t_high} / {t_low}' if (t_type or t_high) else '无数据'
-    sx_now = seniverse.get('now') if isinstance(seniverse, Dict) else None
-    if isinstance(sx_now, Dict) and sx_now:
-        sx_temp = sx_now.get('temperature')
-        sx_now_str = (f'🛰️ {sx_now.get("text", "—")} {sx_temp}℃'
-                      if sx_temp is not None else f'🛰️ {sx_now.get("text", "—")}')
-    else:
-        sx_now_str = '🛰️ 无数据'
-    header = (f'<div style="{STYLE_CONTAINER}font-size:16px;font-weight:bold;">'
-              f'📍 {city_name}</div>'
-              f'<div style="font-size:13px;color:#333;margin-bottom:6px;">'
-              f'{ib_weather} &nbsp;&nbsp;|&nbsp;&nbsp; '
-              f'<span style="font-weight:normal;color:#333;">{sx_now_str}</span></div>')
+    # ---------- Hero 头部 ----------
+    grad_start, grad_end = weather_theme(t_type)
+    hero_emoji = cond_emoji(t_type)
 
-    # ---------- 风力/空气/湿度：圆形 chip（无外围带圈）----------
-    if ib_ok:
-        wx_chips = ''.join([
-            _chip(f'💨 风力：{fx} {fl}'),
-            _chip(f'🌫️ 空气：{quality}'),
-            _chip(f'💧 湿度：{shidu}'),
-        ])
-        wx_block = f'<div style="margin-bottom:6px;line-height:1.8;">{wx_chips}</div>'
-    else:
-        wx_block = ('<div style="margin-bottom:6px;font-size:10px;color:#999;">'
-                    'itboy 天气获取失败，无法展示风力/空气/湿度</div>')
-
-    # ---------- itboy 近三天（逐行，与未来三天格式一致）----------
-    if ib_ok:
-        near3 = (f'<div style="font-size:10px;color:#777;line-height:1.8;margin:4px 0;">'
-                 f'昨日  &nbsp; &nbsp; {y_type}  &nbsp; &nbsp; {y_high} / {y_low}<br>'
-                 f'今日  &nbsp; &nbsp; {t_type}  &nbsp; &nbsp; {t_high} / {t_low}<br>'
-                 f'明日  &nbsp; &nbsp; {mo_type}  &nbsp; &nbsp; {mo_high} / {mo_low}</div>')
-    else:
-        near3 = '<div style="font-size:10px;color:#999;margin:4px 0;">itboy 天气获取失败</div>'
-
-    # ---------- 心知未来三天（逐行，与近三天格式一致，含日期星期）----------
+    # 日期星期：优先 itboy 今日 ymd，其次心知 daily[0]
+    date_md = _md(today_ymd) if today_ymd else ""
     sx_daily = seniverse.get('daily') if isinstance(seniverse, Dict) else None
-    if isinstance(sx_daily, list) and sx_daily:
-        flines = []
-        for d in sx_daily:
-            e = []
-            if d.get('wind_speed'):
-                e.append(f"风{d.get('wind_speed')}km/h")
-            if d.get('humidity'):
-                e.append(f"湿{d.get('humidity')}%")
-            if d.get('rainfall'):
-                e.append(f"降水{d.get('rainfall')}mm")
-            detail = f" [{''.join(e)}]" if e else ""
-            wk = _weekday_cn(d.get('date', ''))
-            date_cell = f"{d.get('date', '')[-5:]} {wk}".strip()  # '07-16 周四'
-            flines.append(
-                f'{date_cell} &nbsp; {d.get("text_day", "")}/{d.get("text_night", "")} '
-                f'&nbsp; {d.get("low", "")}~{d.get("high", "")}℃{detail}'
-            )
-        seniverse_future = (f'<div style="font-size:10px;color:#555;line-height:1.8;margin:4px 0;">'
-                            f'{"<br>".join(flines)}</div>')
-    else:
-        seniverse_future = '<div style="font-size:10px;color:#999;margin:4px 0;">🛰️ 未来三天：无数据</div>'
+    if not date_md and isinstance(sx_daily, list) and sx_daily:
+        date_md = _md(sx_daily[0].get('date', ''))
+    wk = _weekday_cn(today_ymd) if today_ymd else (
+        _weekday_cn(sx_daily[0].get('date', '')) if isinstance(sx_daily, list) and sx_daily else "")
+    date_line = f"{date_md} {wk}".strip()
 
-    # ---------- 生活指数：圆形 chip + emoji（无外围带圈，风格对齐风力行）----------
+    # 大号温度：优先 itboy 今日高温数字，缺失用心知实况
+    sx_now = seniverse.get('now') if isinstance(seniverse, Dict) else None
+    sx_temp = sx_now.get('temperature') if isinstance(sx_now, Dict) else None
+    hero_temp = t_high or (str(sx_temp) if sx_temp is not None else '--')
+    cond_text = t_type or (sx_now.get('text', '') if isinstance(sx_now, Dict) else '')
+
+    # 元信息 chips（风力/湿度/空气/实况；昨日已在五天预报列展示，此处不再重复）
+    meta_items = []
+    if fx or fl:
+        meta_items.append(f"💨 {fx} {fl}".strip())
+    if shidu:
+        meta_items.append(f"💧 湿度{shidu}")
+    if quality:
+        meta_items.append(f"🌫️ {quality}")
+    if sx_temp is not None:
+        meta_items.append(f"📡 实况 {sx_temp}°")
+    meta_html = ''.join(
+        f'<span style="margin-right:10px;margin-bottom:3px;">{m}</span>' for m in meta_items
+    ) if meta_items else '<span style="opacity:0.85;">数据获取中…</span>'
+
+    hero = f'''
+<div style="background:linear-gradient(135deg,{grad_start} 0%,{grad_end} 100%);
+            border-radius:14px 14px 0 0; padding:12px 14px; color:#fff;">
+    <div style="display:flex; justify-content:space-between; align-items:center;
+                font-size:12px; opacity:0.95;">
+        <span>📍 {city_name}</span>
+        <span>{date_line}</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-top:8px;">
+        <div style="font-size:32px; line-height:1; margin-right:10px;">{hero_emoji}</div>
+        <div>
+            <div style="font-size:32px; font-weight:700; line-height:1;">{hero_temp}°</div>
+            <div style="font-size:13px; opacity:0.95; margin-top:2px;">{cond_text} · 低温 {t_low}°</div>
+        </div>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; margin-top:10px; font-size:11px; opacity:0.95;">
+        {meta_html}
+    </div>
+</div>
+    '''.strip()
+
+    # ---------- 最近五天（昨天/今天/未来三天），今天高亮 ----------
+    forecast = _build_forecast(itboy)
+    if forecast:
+        cols = []
+        for i, d in enumerate(forecast):
+            border = '' if i == 0 else 'border-left:1px solid #eee;'
+            if d['today']:
+                cell = 'background:#fff8e1; border-radius:8px; box-shadow:inset 0 0 0 1px #ffd54f;'
+                lbl = 'color:#f57c00; font-weight:700;'
+            else:
+                cell = ''
+                lbl = 'color:#999;'
+            cols.append(f'''
+<div style="flex:1; {border}">
+    <div style="padding:3px 2px; {cell}">
+        <div style="font-size:10px; {lbl}">{d['label']}</div>
+        <div style="font-size:18px; margin:2px 0; line-height:1;">{d['emoji']}</div>
+        <div style="font-size:13px; color:#333; font-weight:600;">{d['high']}°</div>
+        <div style="font-size:10px; color:#999;">{d['low']}°</div>
+    </div>
+</div>'''.strip())
+        forecast_html = f'''
+<div style="border-top:1px solid #f0f0f0; border-bottom:1px solid #f0f0f0;
+            padding:8px 0; display:flex; text-align:center;">
+    {''.join(cols)}
+</div>'''
+        section_forecast = (f'<div style="font-size:12px; font-weight:600; color:#333; '
+                            f'margin-bottom:2px;">📅 最近五天</div>{forecast_html}')
+    else:
+        section_forecast = ('<div style="font-size:12px; color:#999; padding:10px 0;">'
+                            '最近五天：暂无数据</div>')
+
+    # ---------- 生活指数（两列网格，图标/分类/内容对齐）----------
     sx_sug = seniverse.get('suggestion') if isinstance(seniverse, Dict) else None
-    sug_chips = []
+    sug_items = []
     if isinstance(sx_sug, Dict):
         for key, val in sx_sug.items():
             name = SUGGESTION_NAMES.get(key, key)
             emoji = SUGGESTION_EMOJI.get(key, "•")
             brief = val.get('brief', '') if isinstance(val, Dict) else ''
             if brief:
-                sug_chips.append(_chip(f'{emoji} {name}：{brief}'))
-    if sug_chips:
-        sug_block = f'<div style="margin-bottom:6px;line-height:1.8;">{"".join(sug_chips)}</div>'
+                sug_items.append(f'''
+<div style="width:50%; box-sizing:border-box; display:flex; align-items:center;
+            padding:4px 4px; font-size:11px;">
+    <span style="width:18px; text-align:center; flex:none; margin-right:5px;">{emoji}</span>
+    <span style="width:46px; flex:none; color:#333; font-weight:600;">{name}</span>
+    <span style="color:#666; flex:1; text-align:left;">{brief}</span>
+</div>'''.strip())
+    if sug_items:
+        section_sug = (f'<div style="font-size:12px; font-weight:600; color:#333; '
+                       f'margin:12px 0 2px;">🧭 生活指数</div>'
+                       f'<div style="display:flex; flex-wrap:wrap;">{"".join(sug_items)}</div>')
     else:
-        sug_block = ('<div style="margin-bottom:6px;font-size:10px;color:#999;">'
-                     '🛰️ 生活指数：无数据</div>')
+        section_sug = ('<div style="font-size:12px; color:#999; margin-top:12px;">'
+                       '🧭 生活指数：暂无数据</div>')
 
     # ---------- 温馨提示 ----------
-    notice_block = f'<div style="{STYLE_NOTICE}">💡 {notice}</div>' if (ib_ok and notice) else ''
+    notice_html = f'<div style="{STYLE_NOTICE}">💡 {notice}</div>' if (ib_ok and notice) else ''
 
+    # ---------- 组装卡片（紧凑，单城不超一屏）----------
     return f'''
-<div style="{STYLE_CITY_CARD}">
-    {header}
-    {wx_block}
-    {near3}
-    {seniverse_future}
-    {sug_block}
-    {notice_block}
+<div style="background:#fff; border-radius:14px; overflow:hidden;
+            box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:12px;">
+    {hero}
+    <div style="padding:12px 14px;">
+        {section_forecast}
+        {section_sug}
+        {notice_html}
+    </div>
 </div>
-        '''.strip()
+    '''.strip()
 
 
 def iciba_to_html(data: Dict) -> str:
@@ -479,11 +590,13 @@ def main():
             logger.error(f"获取城市 {city_codes[i]} 天气失败")
         weather_htmls.append(city_block_html(result, seniverse_results[i], city_label))
 
-    # 组装完整 HTML（标题块已移除，渐变样式用于各城市名称头部）
+    # 组装完整 HTML（外层容器背景，避免卡片在纯白页面上发飘）
     full_html = f'''
-{' '.join(weather_htmls)}
+<div style="background:#f5f6fa; padding:12px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+{''.join(weather_htmls)}
 
 {iciba_to_html(iciba_result)}
+</div>
     '''.strip()
 
     # 推送
