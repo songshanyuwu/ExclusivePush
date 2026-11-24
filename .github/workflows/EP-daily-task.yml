@@ -1,13 +1,41 @@
 name: EP-daily-task
 
+# ============================================================
+# 时间说明
+#   cron 一律用 UTC。北京时间 = UTC + 8，所以：目标时间 - 8 小时。
+#   本文件：21:40 UTC = 次日 05:40 北京时间（脚本约 1-3 分钟，5:45 前后推完）
+#
+#   注意：GitHub 的 schedule 只是「到点排队」，不是精确闹钟。
+#   本仓库实测延迟 2-8 小时且逐月恶化（2026-11-24 延迟 7 小时 57 分）。
+#   要准点，请用外部定时器（见 worker/ 目录）调用 workflow_dispatch。
+#
+#   下面两个兜底开关，按需打开：
+#     WINDOW_GUARD = true  只在 04:00-08:59（北京）之间推送，迟到到白天的运行自动跳过
+#     DEDUP_GUARD  = true  当天已成功推送过就跳过，防止「schedule + 外部触发」推两次
+# ============================================================
+
 on:
 
-  workflow_dispatch: # 手动触发
-  schedule:
-    # cron 用 UTC，北京时间 = UTC + 8，所以要拿目标时间减 8 小时再填。
-    # 05:40(北京) - 8h = 21:40(UTC)  →  每天北京 05:40 触发，5:45 前后推完
-    # 故意不用整点（:00），整点是全球调度最挤的时刻，容易排到几小时后
+  workflow_dispatch: # 手动触发（外部定时器也走这个）
+
+  schedule: # 计划任务触发
+    # 05:40(北京) - 8h = 21:40(UTC)
+    # 不用整点：整点（:00）是全球调度最挤的时刻，最容易被排到几小时后
     - cron: '40 21 * * *'
+
+# 去重检查要读 Actions 运行记录，其余只需读代码
+permissions:
+  actions: read
+  contents: read
+
+# 两个触发源撞在一起时，排队而不是并发推送
+concurrency:
+  group: ep-daily-task
+  cancel-in-progress: false
+
+env:
+  WINDOW_GUARD: 'true' # 改成 'false' 关闭时间窗限制
+  DEDUP_GUARD: 'true' # 改成 'false' 关闭当天去重
 
 jobs:
   run-EP-tool:
@@ -15,68 +43,116 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    
-    # 输出服务器的IP
-    #- name: IP
-    #  run: sudo curl ifconfig.me
 
-    # 设置服务器时区为东八区 
+    # 把 runner 的时区设成东八区（只影响容器内部，不影响 cron 触发时间）
     - name: Set time zone
       run: sudo timedatectl set-timezone 'Asia/Shanghai'
 
-    # 检出，就是官方社区贡献的用来拉取仓库分支的 Action，你不需要考虑安装 git 命令工具，只需要把分支参数传入即可。
     - name: Checkout
       uses: actions/checkout@v4
 
-    # Python 环境
+    # ---------- 兜底 1：时间窗 ----------
+    - name: 时间窗检查
+      id: window
+      run: |
+        H=$(TZ=Asia/Shanghai date +%H)
+        echo "当前北京时间：$(TZ=Asia/Shanghai date '+%F %H:%M:%S')"
+        if [ "$WINDOW_GUARD" != "true" ]; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "时间窗检查未启用"
+        elif [ "$H" -ge 4 ] && [ "$H" -le 8 ]; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "在 04:00-08:59 窗口内，继续"
+        else
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::当前 ${H} 点不在 04:00-08:59 窗口内（GitHub 调度迟到），本次跳过推送"
+        fi
+
+    # ---------- 兜底 2：当天去重 ----------
+    - name: 当天是否已推送
+      id: dedup
+      if: steps.window.outputs.ok == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python3 - <<'PY'
+        import datetime, json, os, urllib.request
+
+        if os.environ.get("DEDUP_GUARD") != "true":
+            print("去重检查未启用")
+            open(os.environ["GITHUB_OUTPUT"], "a").write("skip=false\n")
+            raise SystemExit(0)
+
+        tz = datetime.timezone(datetime.timedelta(hours=8))
+        start = datetime.datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        repo = os.environ["GITHUB_REPOSITORY"]
+        url = (f"https://api.github.com/repos/{repo}"
+               "/actions/workflows/EP-daily-task.yml/runs?status=success&per_page=30")
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+            "Accept": "application/vnd.github+json",
+        })
+        runs = json.load(urllib.request.urlopen(req, timeout=20)).get("workflow_runs", [])
+        done = [r for r in runs
+                if datetime.datetime.fromisoformat(
+                    r["created_at"].replace("Z", "+00:00")).astimezone(tz) >= start]
+
+        if done:
+            print(f"今天已成功推送过（run {done[0]['id']}，{done[0]['created_at']} UTC），本次跳过")
+            skip = "true"
+        else:
+            print("今天还没有成功推送，继续")
+            skip = "false"
+        open(os.environ["GITHUB_OUTPUT"], "a").write(f"skip={skip}\n")
+        PY
+
+    # ---------- 以下步骤只在「窗口内 + 今天没推过」时执行 ----------
     - name: Set up Python 3.12
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        
-    #- name: Install dependencies
-    #  run: |
-    ##    python -m pip install --upgrade pip
-    #    pip install requests json
-    #    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # 安装脚本所需的依赖
     - name: Install requests
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
       run: pip install requests
 
     - name: Install dependencies
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
       run: pip install -r requirements.txt
-    
+
     - name: Install lxml
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
       run: pip install lxml
-      
-    # 安装 aiohttp（异步并发） - 新闻联播脚本优化所需
+
+    # aiohttp（异步并发） - 新闻联播脚本优化所需
     - name: Install aiohttp
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
       run: pip install aiohttp
-      
-    # 安装 tenacity（重试机制） - 新闻联播脚本优化所需
+
+    # tenacity（重试机制） - 新闻联播脚本优化所需
     - name: Install tenacity
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
       run: pip install tenacity
-      
-    # 运行脚本
+
     - name: 'Working1'
-      env:  # 添加环境变量
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
+      env:
         SENIVERSE_API_KEY: ${{ secrets.SENIVERSE_API_KEY }}
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
         SERVERSCKEY: ${{ secrets.SERVERSCKEY }}
         COOLSCKEY: ${{ secrets.COOLSCKEY }}
         QMSGSCKEY: ${{ secrets.QMSGSCKEY }}
-      # run: python weather.py
       run: python weather-new.py
-      
-    # 运行脚本
+
     - name: 'Working2'
-      env:  # 添加环境变量
+      if: steps.window.outputs.ok == 'true' && steps.dedup.outputs.skip != 'true'
+      env:
         PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
       run: python news_plus.py
-      
-    # 运行脚本
-    #- name: 'Working3'
-    #  env:  # 添加环境变量
-    #    PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
-    #  run: python epidemicSsituation.py
+
+    # 疫情通报已停用
+    # - name: 'Working3'
+    #   env:
+    #     PUSHPLUSSCKEY: ${{ secrets.PUSHPLUSSCKEY }}
+    #   run: python epidemicSsituation.py
